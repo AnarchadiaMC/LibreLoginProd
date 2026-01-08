@@ -19,6 +19,8 @@ import com.github.retrooper.packetevents.wrapper.login.client.WrapperLoginClient
 import com.github.retrooper.packetevents.wrapper.login.client.WrapperLoginClientLoginStart;
 import com.github.retrooper.packetevents.wrapper.login.server.WrapperLoginServerDisconnect;
 import com.github.retrooper.packetevents.wrapper.login.server.WrapperLoginServerEncryptionRequest;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import io.github.retrooper.packetevents.util.SpigotReflectionUtil;
 import io.papermc.paper.event.player.AsyncPlayerSpawnLocationEvent;
 import java.io.BufferedReader;
@@ -33,10 +35,6 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import org.bukkit.profile.PlayerTextures;
-import xyz.kyngs.librelogin.paper.util.PlayerDataReader;
 import javax.crypto.*;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -59,6 +57,7 @@ import xyz.kyngs.librelogin.common.util.GeneralUtil;
 import xyz.kyngs.librelogin.paper.protocol.ClientPublicKey;
 import xyz.kyngs.librelogin.paper.protocol.EncryptionUtil;
 import xyz.kyngs.librelogin.paper.protocol.ProtocolUtil;
+import xyz.kyngs.librelogin.paper.util.PlayerDataReader;
 
 public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, World>
         implements Listener {
@@ -153,7 +152,10 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
             try {
                 var textures = newProfile.getTextures();
                 // Set skin URL from the skin data
-                var skinJson = new String(java.util.Base64.getDecoder().decode(skin.value()), StandardCharsets.UTF_8);
+                var skinJson =
+                        new String(
+                                java.util.Base64.getDecoder().decode(skin.value()),
+                                StandardCharsets.UTF_8);
                 var parsed = JsonParser.parseString(skinJson).getAsJsonObject();
                 var texturesObj = parsed.getAsJsonObject("textures");
                 if (texturesObj != null && texturesObj.has("SKIN")) {
@@ -162,7 +164,12 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                     newProfile.setTextures(textures);
                 }
             } catch (Exception e) {
-                plugin.getLogger().warn("Failed to apply skin for " + event.getName() + ": " + e.getMessage());
+                plugin.getLogger()
+                        .warn(
+                                "Failed to apply skin for "
+                                        + event.getName()
+                                        + ": "
+                                        + e.getMessage());
             }
             skinCache.invalidate(profileUuid);
         }
@@ -215,40 +222,42 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                 // Get the primary world folder to read playerdata
                 var primaryWorld = Bukkit.getWorlds().get(0);
                 Path worldFolder = primaryWorld.getWorldFolder().toPath();
-                
+
                 var playerPosition = PlayerDataReader.readPlayerPosition(worldFolder, puuid);
                 if (playerPosition != null) {
                     String targetWorldName = playerPosition.getWorldName();
                     World targetWorld = Bukkit.getWorld(targetWorldName);
-                    
+
                     // Fall back to dimension key lookup if standard name doesn't work
                     if (targetWorld == null && playerPosition.dimension() != null) {
                         for (World w : Bukkit.getWorlds()) {
-                            if (w.getKey().toString().equals(playerPosition.dimension()) ||
-                                w.getName().equals(playerPosition.dimension())) {
+                            if (w.getKey().toString().equals(playerPosition.dimension())
+                                    || w.getName().equals(playerPosition.dimension())) {
                                 targetWorld = w;
                                 break;
                             }
                         }
                     }
-                    
+
                     if (targetWorld != null) {
-                        playerDataLocation = new Location(
-                            targetWorld,
-                            playerPosition.x(),
-                            playerPosition.y(),
-                            playerPosition.z(),
-                            playerPosition.yaw(),
-                            playerPosition.pitch()
-                        );
+                        playerDataLocation =
+                                new Location(
+                                        targetWorld,
+                                        playerPosition.x(),
+                                        playerPosition.y(),
+                                        playerPosition.z(),
+                                        playerPosition.yaw(),
+                                        playerPosition.pitch());
                     }
                 }
             } catch (Exception e) {
-                plugin.getLogger().debug("Could not read player.dat for " + puuid + ": " + e.getMessage());
+                plugin.getLogger()
+                        .debug("Could not read player.dat for " + puuid + ": " + e.getMessage());
             }
 
             // Determine spawn location logic
-            // world.key() is true if it's a Lobby (Authenticated/Auto-Login), false if Limbo (Needs Auth)
+            // world.key() is true if it's a Lobby (Authenticated/Auto-Login), false if Limbo (Needs
+            // Auth)
             if (world.key()) {
                 // User is already authenticated (Auto-Login) or going to Lobby
                 // Spawn them directly at their last known location
@@ -264,12 +273,15 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                     spawnLocationCache.put(puuid, playerDataLocation);
                 } else {
                     // Check if the current spawn location is valid (not a limbo world)
-                    if (!plugin.getConfiguration().get(ConfigurationKeys.LIMBO)
+                    if (!plugin.getConfiguration()
+                            .get(ConfigurationKeys.LIMBO)
                             .contains(event.getSpawnLocation().getWorld().getName())) {
                         spawnLocationCache.put(puuid, event.getSpawnLocation());
                     } else {
                         // Fallback to lobby spawn if we can't find a safe previous location
-                        var fallbackLobby = plugin.getServerHandler().chooseLobbyServer(null, null, false, true);
+                        var fallbackLobby =
+                                plugin.getServerHandler()
+                                        .chooseLobbyServer(null, null, false, true);
                         if (fallbackLobby != null) {
                             spawnLocationCache.put(puuid, fallbackLobby.getSpawnLocation());
                         }
@@ -449,7 +461,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
             try {
                 // Use the new method that also captures skin data
-                var skinResult = hasJoinedWithSkin(username, serverId, address.getAddress(), data.uuid());
+                var skinResult =
+                        hasJoinedWithSkin(username, serverId, address.getAddress(), data.uuid());
                 if (skinResult != null) {
                     receiveFakeStartPacket(
                             username, data.publicKey(), event.getChannel(), data.uuid());
@@ -512,10 +525,11 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
     /**
      * Verifies player session with Mojang and extracts skin data.
-     * 
+     *
      * @return SkinData if verification successful and skin available, null if verification failed
      */
-    public SkinData hasJoinedWithSkin(String username, String serverHash, InetAddress hostIp, UUID playerUuid)
+    public SkinData hasJoinedWithSkin(
+            String username, String serverHash, InetAddress hostIp, UUID playerUuid)
             throws IOException {
         String url;
         if (hostIp instanceof Inet6Address
@@ -537,21 +551,23 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         conn.setReadTimeout(5000);
         conn.connect();
         int responseCode = conn.getResponseCode();
-        
+
         if (responseCode == 204) {
             conn.disconnect();
             return null; // Session verification failed
         }
-        
+
         // Read the response to extract skin data
         SkinData skinData = null;
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+        try (BufferedReader reader =
+                new BufferedReader(
+                        new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
             StringBuilder response = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
                 response.append(line);
             }
-            
+
             if (response.length() > 0) {
                 JsonObject json = JsonParser.parseString(response.toString()).getAsJsonObject();
                 if (json.has("properties")) {
@@ -560,9 +576,12 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                         var propObj = prop.getAsJsonObject();
                         if ("textures".equals(propObj.get("name").getAsString())) {
                             String value = propObj.get("value").getAsString();
-                            String signature = propObj.has("signature") ? propObj.get("signature").getAsString() : null;
+                            String signature =
+                                    propObj.has("signature")
+                                            ? propObj.get("signature").getAsString()
+                                            : null;
                             skinData = new SkinData(value, signature);
-                            
+
                             // Cache the skin for application in onPreLogin
                             if (playerUuid != null) {
                                 skinCache.put(playerUuid, skinData);
@@ -575,9 +594,11 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         } catch (Exception e) {
             plugin.getLogger().debug("Failed to parse skin data: " + e.getMessage());
         }
-        
+
         conn.disconnect();
-        return skinData != null ? skinData : new SkinData(null, null); // Return non-null to indicate success
+        return skinData != null
+                ? skinData
+                : new SkinData(null, null); // Return non-null to indicate success
     }
 
     public boolean hasJoined(String username, String serverHash, InetAddress hostIp)

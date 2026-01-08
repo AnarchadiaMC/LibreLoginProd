@@ -13,9 +13,7 @@ import java.nio.file.Path;
 import java.util.UUID;
 import java.util.zip.GZIPInputStream;
 
-/**
- * Utility class to read player position data from Minecraft's NBT player.dat files.
- */
+/** Utility class to read player position data from Minecraft's NBT player.dat files. */
 public class PlayerDataReader {
 
     private static final byte TAG_END = 0;
@@ -40,14 +38,15 @@ public class PlayerDataReader {
      * @return PlayerPosition containing location data, or null if not found
      */
     public static PlayerPosition readPlayerPosition(Path worldFolder, UUID playerUuid) {
-        Path playerDataFile = worldFolder.resolve("playerdata").resolve(playerUuid.toString() + ".dat");
+        Path playerDataFile =
+                worldFolder.resolve("playerdata").resolve(playerUuid.toString() + ".dat");
 
         if (!Files.exists(playerDataFile)) {
             return null;
         }
 
-        try (DataInputStream dis = new DataInputStream(
-                new GZIPInputStream(Files.newInputStream(playerDataFile)))) {
+        try (DataInputStream dis =
+                new DataInputStream(new GZIPInputStream(Files.newInputStream(playerDataFile)))) {
 
             // Read root compound tag
             byte tagType = dis.readByte();
@@ -225,21 +224,20 @@ public class PlayerDataReader {
         }
     }
 
-    /**
-     * Record holding player position data extracted from player.dat
-     */
-    public record PlayerPosition(double x, double y, double z, float yaw, float pitch, String dimension) {
-        
+    /** Record holding player position data extracted from player.dat */
+    public record PlayerPosition(
+            double x, double y, double z, float yaw, float pitch, String dimension) {
+
         /**
-         * Gets the world name from the dimension string.
-         * Converts "minecraft:overworld" to "world", "minecraft:the_nether" to "world_nether", etc.
-         * For custom dimensions, returns the dimension key as-is.
+         * Gets the world name from the dimension string. Converts "minecraft:overworld" to "world",
+         * "minecraft:the_nether" to "world_nether", etc. For custom dimensions, returns the
+         * dimension key as-is.
          */
         public String getWorldName() {
             if (dimension == null) {
                 return "world";
             }
-            
+
             return switch (dimension) {
                 case "minecraft:overworld" -> "world";
                 case "minecraft:the_nether" -> "world_nether";
