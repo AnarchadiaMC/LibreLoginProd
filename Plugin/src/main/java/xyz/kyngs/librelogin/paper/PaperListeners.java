@@ -21,15 +21,22 @@ import com.github.retrooper.packetevents.wrapper.login.server.WrapperLoginServer
 import com.github.retrooper.packetevents.wrapper.login.server.WrapperLoginServerEncryptionRequest;
 import io.github.retrooper.packetevents.util.SpigotReflectionUtil;
 import io.papermc.paper.event.player.AsyncPlayerSpawnLocationEvent;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.lang.reflect.Method;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.*;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import org.bukkit.profile.PlayerTextures;
+import xyz.kyngs.librelogin.paper.util.PlayerDataReader;
 import javax.crypto.*;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -83,6 +90,7 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
     private final Cache<UUID, String> ipCache;
     private final Cache<UUID, User> readOnlyUserCache;
     private final Cache<UUID, Location> spawnLocationCache;
+    private final Cache<UUID, SkinData> skinCache;
 
     public PaperListeners(PaperLibreLogin plugin) {
         super(plugin);
@@ -94,6 +102,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         readOnlyUserCache = Caffeine.newBuilder().expireAfterWrite(2, TimeUnit.MINUTES).build();
 
         spawnLocationCache = Caffeine.newBuilder().expireAfterWrite(2, TimeUnit.MINUTES).build();
+
+        skinCache = Caffeine.newBuilder().expireAfterWrite(2, TimeUnit.MINUTES).build();
     }
 
     public Cache<UUID, Location> getSpawnLocationCache() {
@@ -133,11 +143,33 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
         var user = plugin.getDatabaseProvider().getByName(event.getName());
 
-        var newProfile = Bukkit.createProfileExact(user.getUuid(), event.getName());
+        // For premium players, use their Mojang UUID (premiumUUID) to preserve player data
+        UUID profileUuid = user.getPremiumUUID() != null ? user.getPremiumUUID() : user.getUuid();
+        var newProfile = Bukkit.createProfileExact(profileUuid, event.getName());
+
+        // Apply skin if available (from previous session verification)
+        var skin = skinCache.getIfPresent(profileUuid);
+        if (skin != null) {
+            try {
+                var textures = newProfile.getTextures();
+                // Set skin URL from the skin data
+                var skinJson = new String(java.util.Base64.getDecoder().decode(skin.value()), StandardCharsets.UTF_8);
+                var parsed = JsonParser.parseString(skinJson).getAsJsonObject();
+                var texturesObj = parsed.getAsJsonObject("textures");
+                if (texturesObj != null && texturesObj.has("SKIN")) {
+                    var skinUrl = texturesObj.getAsJsonObject("SKIN").get("url").getAsString();
+                    textures.setSkin(new URL(skinUrl));
+                    newProfile.setTextures(textures);
+                }
+            } catch (Exception e) {
+                plugin.getLogger().warn("Failed to apply skin for " + event.getName() + ": " + e.getMessage());
+            }
+            skinCache.invalidate(profileUuid);
+        }
 
         event.setPlayerProfile(newProfile);
 
-        readOnlyUserCache.put(user.getUuid(), user);
+        readOnlyUserCache.put(profileUuid, user);
     }
 
     // Changed to an async variant of this event
@@ -177,21 +209,74 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                                                                                     ? "lobby"
                                                                                     : "limbo"))));
         } else {
-            // This is terrible, but should work
-            if (!event.isNewPlayer()
-                    && !plugin.getConfiguration()
-                            .get(ConfigurationKeys.LIMBO)
-                            .contains(event.getSpawnLocation().getWorld().getName())) {
-                if (plugin.getConfiguration()
-                        .get(ConfigurationKeys.LIMBO)
-                        .contains(world.value().getName())) {
-                    spawnLocationCache.put(puuid, event.getSpawnLocation());
-                } else {
-                    return;
+            // Try to read player's last position from player.dat
+            Location playerDataLocation = null;
+            try {
+                // Get the primary world folder to read playerdata
+                var primaryWorld = Bukkit.getWorlds().get(0);
+                Path worldFolder = primaryWorld.getWorldFolder().toPath();
+                
+                var playerPosition = PlayerDataReader.readPlayerPosition(worldFolder, puuid);
+                if (playerPosition != null) {
+                    String targetWorldName = playerPosition.getWorldName();
+                    World targetWorld = Bukkit.getWorld(targetWorldName);
+                    
+                    // Fall back to dimension key lookup if standard name doesn't work
+                    if (targetWorld == null && playerPosition.dimension() != null) {
+                        for (World w : Bukkit.getWorlds()) {
+                            if (w.getKey().toString().equals(playerPosition.dimension()) ||
+                                w.getName().equals(playerPosition.dimension())) {
+                                targetWorld = w;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (targetWorld != null) {
+                        playerDataLocation = new Location(
+                            targetWorld,
+                            playerPosition.x(),
+                            playerPosition.y(),
+                            playerPosition.z(),
+                            playerPosition.yaw(),
+                            playerPosition.pitch()
+                        );
+                    }
                 }
+            } catch (Exception e) {
+                plugin.getLogger().debug("Could not read player.dat for " + puuid + ": " + e.getMessage());
             }
 
-            event.setSpawnLocation(world.value().getSpawnLocation());
+            // Determine spawn location logic
+            // world.key() is true if it's a Lobby (Authenticated/Auto-Login), false if Limbo (Needs Auth)
+            if (world.key()) {
+                // User is already authenticated (Auto-Login) or going to Lobby
+                // Spawn them directly at their last known location
+                if (playerDataLocation != null) {
+                    event.setSpawnLocation(playerDataLocation);
+                } else {
+                    event.setSpawnLocation(world.value().getSpawnLocation());
+                }
+            } else {
+                // User needs to authenticate (Limbo)
+                // Cache their destination for after authentication
+                if (playerDataLocation != null) {
+                    spawnLocationCache.put(puuid, playerDataLocation);
+                } else {
+                    // Check if the current spawn location is valid (not a limbo world)
+                    if (!plugin.getConfiguration().get(ConfigurationKeys.LIMBO)
+                            .contains(event.getSpawnLocation().getWorld().getName())) {
+                        spawnLocationCache.put(puuid, event.getSpawnLocation());
+                    } else {
+                        // Fallback to lobby spawn if we can't find a safe previous location
+                        var fallbackLobby = plugin.getServerHandler().chooseLobbyServer(null, null, false, true);
+                        if (fallbackLobby != null) {
+                            spawnLocationCache.put(puuid, fallbackLobby.getSpawnLocation());
+                        }
+                    }
+                }
+                event.setSpawnLocation(world.value().getSpawnLocation());
+            }
         }
     }
 
@@ -363,7 +448,9 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
             var address = user.getAddress();
 
             try {
-                if (hasJoined(username, serverId, address.getAddress())) {
+                // Use the new method that also captures skin data
+                var skinResult = hasJoinedWithSkin(username, serverId, address.getAddress(), data.uuid());
+                if (skinResult != null) {
                     receiveFakeStartPacket(
                             username, data.publicKey(), event.getChannel(), data.uuid());
                 } else {
@@ -421,6 +508,76 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                             getServerVersion().toClientVersion(), username);
         }
         PacketEvents.getAPI().getProtocolManager().receivePacketSilently(channel, startPacket);
+    }
+
+    /**
+     * Verifies player session with Mojang and extracts skin data.
+     * 
+     * @return SkinData if verification successful and skin available, null if verification failed
+     */
+    public SkinData hasJoinedWithSkin(String username, String serverHash, InetAddress hostIp, UUID playerUuid)
+            throws IOException {
+        String url;
+        if (hostIp instanceof Inet6Address
+                || plugin.getConfiguration().get(ConfigurationKeys.ALLOW_PROXY_CONNECTIONS)) {
+            url =
+                    String.format(
+                            "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s",
+                            username, serverHash);
+        } else {
+            var encodedIP = URLEncoder.encode(hostIp.getHostAddress(), StandardCharsets.UTF_8);
+            url =
+                    String.format(
+                            "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s&ip=%s",
+                            username, serverHash, encodedIP);
+        }
+
+        var conn = (HttpURLConnection) new URL(url).openConnection();
+        conn.setConnectTimeout(5000);
+        conn.setReadTimeout(5000);
+        conn.connect();
+        int responseCode = conn.getResponseCode();
+        
+        if (responseCode == 204) {
+            conn.disconnect();
+            return null; // Session verification failed
+        }
+        
+        // Read the response to extract skin data
+        SkinData skinData = null;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+            StringBuilder response = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+            }
+            
+            if (response.length() > 0) {
+                JsonObject json = JsonParser.parseString(response.toString()).getAsJsonObject();
+                if (json.has("properties")) {
+                    var properties = json.getAsJsonArray("properties");
+                    for (var prop : properties) {
+                        var propObj = prop.getAsJsonObject();
+                        if ("textures".equals(propObj.get("name").getAsString())) {
+                            String value = propObj.get("value").getAsString();
+                            String signature = propObj.has("signature") ? propObj.get("signature").getAsString() : null;
+                            skinData = new SkinData(value, signature);
+                            
+                            // Cache the skin for application in onPreLogin
+                            if (playerUuid != null) {
+                                skinCache.put(playerUuid, skinData);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            plugin.getLogger().debug("Failed to parse skin data: " + e.getMessage());
+        }
+        
+        conn.disconnect();
+        return skinData != null ? skinData : new SkinData(null, null); // Return non-null to indicate success
     }
 
     public boolean hasJoined(String username, String serverHash, InetAddress hostIp)
