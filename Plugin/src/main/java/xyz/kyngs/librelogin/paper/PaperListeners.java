@@ -161,21 +161,22 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
         // Apply skin if available (from previous session verification)
         var skin = skinCache.getIfPresent(profileUuid);
-        if (skin != null) {
+        if (skin != null && skin.value() != null) {
             try {
-                var textures = newProfile.getTextures();
-                // Set skin URL from the skin data
-                var skinJson =
-                        new String(
-                                java.util.Base64.getDecoder().decode(skin.value()),
-                                StandardCharsets.UTF_8);
-                var parsed = JsonParser.parseString(skinJson).getAsJsonObject();
-                var texturesObj = parsed.getAsJsonObject("textures");
-                if (texturesObj != null && texturesObj.has("SKIN")) {
-                    var skinUrl = texturesObj.getAsJsonObject("SKIN").get("url").getAsString();
-                    textures.setSkin(new URL(skinUrl));
-                    newProfile.setTextures(textures);
-                }
+                // Set the full texture property with signature - this is required for
+                // other players to see the skin. Without the signature, only the local
+                // player sees their skin because clients don't trust unsigned textures.
+                var property =
+                        new com.destroystokyo.paper.profile.ProfileProperty(
+                                "textures", skin.value(), skin.signature());
+                newProfile.setProperty(property);
+                plugin.getLogger()
+                        .debug(
+                                "Applied skin property for "
+                                        + event.getName()
+                                        + " (has signature: "
+                                        + (skin.signature() != null)
+                                        + ")");
             } catch (Exception e) {
                 plugin.getLogger()
                         .warn(
