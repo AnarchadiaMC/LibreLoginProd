@@ -22,7 +22,6 @@ import com.github.retrooper.packetevents.wrapper.login.server.WrapperLoginServer
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.github.retrooper.packetevents.util.SpigotReflectionUtil;
-import io.papermc.paper.event.player.AsyncPlayerSpawnLocationEvent;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -48,6 +47,7 @@ import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.spigotmc.event.player.PlayerSpawnLocationEvent;
 import xyz.kyngs.librelogin.api.database.User;
 import xyz.kyngs.librelogin.common.AuthenticLibreLogin;
 import xyz.kyngs.librelogin.common.config.ConfigurationKeys;
@@ -79,6 +79,19 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         } else {
             ENCRYPTION_CLASS = null;
         }
+    }
+
+    // Runtime detection for AsyncPlayerSpawnLocationEvent availability
+    private static final boolean HAS_ASYNC_SPAWN_EVENT;
+
+    static {
+        boolean hasAsyncEvent = false;
+        try {
+            Class.forName("io.papermc.paper.event.player.AsyncPlayerSpawnLocationEvent");
+            hasAsyncEvent = true;
+        } catch (ClassNotFoundException ignored) {
+        }
+        HAS_ASYNC_SPAWN_EVENT = hasAsyncEvent;
     }
 
     private final KeyPair keyPair = EncryptionUtil.generateKeyPair();
@@ -179,12 +192,29 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         readOnlyUserCache.put(profileUuid, user);
     }
 
-    // Changed to an async variant of this event
-    // cuz the previous one is deprecated and causes a bug (Issue #52)
+    // Fallback handler for older Paper/Purpur versions without AsyncPlayerSpawnLocationEvent
+    // Only executes when the async variant is NOT available
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void chooseWorld(AsyncPlayerSpawnLocationEvent event) {
-        var puuid = event.getConnection().getProfile().getId();
+    public void chooseWorld(PlayerSpawnLocationEvent event) {
+        // Skip if async event is available - it will handle this instead
+        if (HAS_ASYNC_SPAWN_EVENT) {
+            return;
+        }
+        handleSpawnLocationPublic(
+                event.getPlayer().getUniqueId(), event.getSpawnLocation(), event::setSpawnLocation);
+    }
 
+    /**
+     * Shared implementation for spawn location handling. Works with both PlayerSpawnLocationEvent
+     * and AsyncPlayerSpawnLocationEvent. Made public to allow access from
+     * AsyncSpawnLocationListener.
+     *
+     * @param puuid Player's UUID
+     * @param currentSpawn The current spawn location from the event
+     * @param setSpawn Consumer to set the new spawn location
+     */
+    public void handleSpawnLocationPublic(
+            UUID puuid, Location currentSpawn, java.util.function.Consumer<Location> setSpawn) {
         var ip = ipCache.getIfPresent(puuid);
         if (ip == null) {
             Bukkit.getScheduler()
@@ -262,9 +292,9 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                 // User is already authenticated (Auto-Login) or going to Lobby
                 // Spawn them directly at their last known location
                 if (playerDataLocation != null) {
-                    event.setSpawnLocation(playerDataLocation);
+                    setSpawn.accept(playerDataLocation);
                 } else {
-                    event.setSpawnLocation(world.value().getSpawnLocation());
+                    setSpawn.accept(world.value().getSpawnLocation());
                 }
             } else {
                 // User needs to authenticate (Limbo)
@@ -275,8 +305,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                     // Check if the current spawn location is valid (not a limbo world)
                     if (!plugin.getConfiguration()
                             .get(ConfigurationKeys.LIMBO)
-                            .contains(event.getSpawnLocation().getWorld().getName())) {
-                        spawnLocationCache.put(puuid, event.getSpawnLocation());
+                            .contains(currentSpawn.getWorld().getName())) {
+                        spawnLocationCache.put(puuid, currentSpawn);
                     } else {
                         // Fallback to lobby spawn if we can't find a safe previous location
                         var fallbackLobby =
@@ -287,7 +317,7 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                         }
                     }
                 }
-                event.setSpawnLocation(world.value().getSpawnLocation());
+                setSpawn.accept(world.value().getSpawnLocation());
             }
         }
     }

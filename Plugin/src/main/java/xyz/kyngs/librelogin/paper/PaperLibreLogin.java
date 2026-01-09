@@ -179,6 +179,21 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
 
         Bukkit.getPluginManager().registerEvents(listeners, bootstrap);
         Bukkit.getPluginManager().registerEvents(new Blockers(this), bootstrap);
+
+        // Try to register AsyncPlayerSpawnLocationEvent listener for newer Paper versions
+        // Falls back to PlayerSpawnLocationEvent in PaperListeners for older versions
+        try {
+            Class.forName("io.papermc.paper.event.player.AsyncPlayerSpawnLocationEvent");
+            Bukkit.getPluginManager()
+                    .registerEvents(new AsyncSpawnLocationListener(listeners), bootstrap);
+            getLogger().debug("Registered AsyncPlayerSpawnLocationEvent listener");
+        } catch (ClassNotFoundException e) {
+            getLogger()
+                    .debug(
+                            "AsyncPlayerSpawnLocationEvent not available, using"
+                                    + " PlayerSpawnLocationEvent fallback");
+        }
+
         PacketEvents.getAPI().getEventManager().registerListener(new PacketListener(listeners));
 
         started = true;
