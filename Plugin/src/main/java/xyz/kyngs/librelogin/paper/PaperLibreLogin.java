@@ -205,6 +205,25 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
 
             var location = listeners.getSpawnLocationCache().getIfPresent(player.getUniqueId());
 
+            // Safety check: NEVER teleport to a limbo world after authentication
+            // This is defense-in-depth in case the caching logic fails or cache has stale data
+            if (location != null) {
+                var limboWorlds =
+                        getConfiguration()
+                                .get(xyz.kyngs.librelogin.common.config.ConfigurationKeys.LIMBO);
+                if (limboWorlds.contains(location.getWorld().getName())) {
+                    getLogger()
+                            .warn(
+                                    "Safety check triggered: Cached location for "
+                                            + player.getName()
+                                            + " was in limbo world "
+                                            + location.getWorld().getName()
+                                            + ". Forcing lobby spawn.");
+                    listeners.getSpawnLocationCache().invalidate(player.getUniqueId());
+                    location = null; // Force fallback to lobby
+                }
+            }
+
             if (location == null) {
                 var world = getServerHandler().chooseLobbyServer(user, player, true, false);
 

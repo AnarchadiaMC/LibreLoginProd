@@ -271,14 +271,28 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                     }
 
                     if (targetWorld != null) {
-                        playerDataLocation =
-                                new Location(
-                                        targetWorld,
-                                        playerPosition.x(),
-                                        playerPosition.y(),
-                                        playerPosition.z(),
-                                        playerPosition.yaw(),
-                                        playerPosition.pitch());
+                        // Check if the saved location is in a limbo world - if so, don't use it
+                        // This prevents players who disconnected in limbo from being stuck there
+                        if (plugin.getConfiguration()
+                                .get(ConfigurationKeys.LIMBO)
+                                .contains(targetWorld.getName())) {
+                            plugin.getLogger()
+                                    .debug(
+                                            "Player "
+                                                    + puuid
+                                                    + " has saved location in limbo world "
+                                                    + targetWorld.getName()
+                                                    + ", ignoring");
+                        } else {
+                            playerDataLocation =
+                                    new Location(
+                                            targetWorld,
+                                            playerPosition.x(),
+                                            playerPosition.y(),
+                                            playerPosition.z(),
+                                            playerPosition.yaw(),
+                                            playerPosition.pitch());
+                        }
                     }
                 }
             } catch (Exception e) {
