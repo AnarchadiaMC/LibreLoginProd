@@ -66,8 +66,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
     private static final Class<?> ENCRYPTION_CLASS;
     private static Method encryptMethod;
     private static Method cipherMethod;
-    private static final boolean IS_DEOBFUSCATION_NEEDED =
-            getServerVersion().isOlderThan(ServerVersion.V_1_21_11);
+    private static final boolean IS_DEOBFUSCATION_NEEDED
+            = getServerVersion().isOlderThan(ServerVersion.V_1_21_11);
 
     static {
         if (IS_DEOBFUSCATION_NEEDED) {
@@ -96,8 +96,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
     private final KeyPair keyPair = EncryptionUtil.generateKeyPair();
     private final Random random = new SecureRandom();
-    private final Cache<String, EncryptionData> encryptionDataCache =
-            Caffeine.newBuilder().expireAfterWrite(2, TimeUnit.MINUTES).build();
+    private final Cache<String, EncryptionData> encryptionDataCache
+            = Caffeine.newBuilder().expireAfterWrite(2, TimeUnit.MINUTES).build();
     private final FloodgateHelper floodgateHelper;
     private final Cache<UUID, String> ipCache;
     private final Cache<UUID, User> readOnlyUserCache;
@@ -151,7 +151,9 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
-        if (plugin.fromFloodgate(event.getName())) return;
+        if (plugin.fromFloodgate(event.getName())) {
+            return;
+        }
 
         var user = plugin.getDatabaseProvider().getByName(event.getName());
 
@@ -166,24 +168,24 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                 // Set the full texture property with signature - this is required for
                 // other players to see the skin. Without the signature, only the local
                 // player sees their skin because clients don't trust unsigned textures.
-                var property =
-                        new com.destroystokyo.paper.profile.ProfileProperty(
+                var property
+                        = new com.destroystokyo.paper.profile.ProfileProperty(
                                 "textures", skin.value(), skin.signature());
                 newProfile.setProperty(property);
                 plugin.getLogger()
                         .debug(
                                 "Applied skin property for "
-                                        + event.getName()
-                                        + " (has signature: "
-                                        + (skin.signature() != null)
-                                        + ")");
+                                + event.getName()
+                                + " (has signature: "
+                                + (skin.signature() != null)
+                                + ")");
             } catch (Exception e) {
                 plugin.getLogger()
                         .warn(
                                 "Failed to apply skin for "
-                                        + event.getName()
-                                        + ": "
-                                        + e.getMessage());
+                                + event.getName()
+                                + ": "
+                                + e.getMessage());
             }
             skinCache.invalidate(profileUuid);
         }
@@ -206,9 +208,9 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
     }
 
     /**
-     * Shared implementation for spawn location handling. Works with both PlayerSpawnLocationEvent
-     * and AsyncPlayerSpawnLocationEvent. Made public to allow access from
-     * AsyncSpawnLocationListener.
+     * Shared implementation for spawn location handling. Works with both
+     * PlayerSpawnLocationEvent and AsyncPlayerSpawnLocationEvent. Made public
+     * to allow access from AsyncSpawnLocationListener.
      *
      * @param puuid Player's UUID
      * @param currentSpawn The current spawn location from the event
@@ -221,12 +223,12 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
             Bukkit.getScheduler()
                     .runTask(
                             plugin.getBootstrap(),
-                            () ->
-                                    Bukkit.getPlayer(puuid)
-                                            .kick(
-                                                    Component.text(
-                                                            "Internal error, please try again"
-                                                                    + " later.")));
+                            ()
+                            -> Bukkit.getPlayer(puuid)
+                                    .kick(
+                                            Component.text(
+                                                    "Internal error, please try again"
+                                                    + " later.")));
             return;
         }
 
@@ -237,15 +239,15 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
             Bukkit.getScheduler()
                     .runTask(
                             plugin.getBootstrap(),
-                            () ->
-                                    Bukkit.getPlayer(puuid)
-                                            .kick(
-                                                    plugin.getMessages()
-                                                            .getMessage(
-                                                                    "kick-no-"
-                                                                            + (world.key()
-                                                                                    ? "lobby"
-                                                                                    : "limbo"))));
+                            ()
+                            -> Bukkit.getPlayer(puuid)
+                                    .kick(
+                                            plugin.getMessages()
+                                                    .getMessage(
+                                                            "kick-no-"
+                                                            + (world.key()
+                                                            ? "lobby"
+                                                            : "limbo"))));
         } else {
             // Try to read player's last position from player.dat
             Location playerDataLocation = null;
@@ -279,13 +281,13 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                             plugin.getLogger()
                                     .debug(
                                             "Player "
-                                                    + puuid
-                                                    + " has saved location in limbo world "
-                                                    + targetWorld.getName()
-                                                    + ", ignoring");
+                                            + puuid
+                                            + " has saved location in limbo world "
+                                            + targetWorld.getName()
+                                            + ", ignoring");
                         } else {
-                            playerDataLocation =
-                                    new Location(
+                            playerDataLocation
+                                    = new Location(
                                             targetWorld,
                                             playerPosition.x(),
                                             playerPosition.y(),
@@ -324,8 +326,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                         spawnLocationCache.put(puuid, currentSpawn);
                     } else {
                         // Fallback to lobby spawn if we can't find a safe previous location
-                        var fallbackLobby =
-                                plugin.getServerHandler()
+                        var fallbackLobby
+                                = plugin.getServerHandler()
                                         .chooseLobbyServer(null, null, false, true);
                         if (fallbackLobby != null) {
                             spawnLocationCache.put(puuid, fallbackLobby.getSpawnLocation());
@@ -353,7 +355,6 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
             kickPlayer("Internal error", player);
         }
     }*/
-
     public void asyncPacketReceive(PacketReceiveEvent event) {
         var user = event.getUser();
         var type = event.getPacketType();
@@ -361,15 +362,58 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         plugin.getLogger()
                 .debug(
                         "Packet received "
-                                + type
-                                + " from "
-                                + user.getName()
-                                + " ("
-                                + user.getAddress().toString()
-                                + ")");
+                        + type
+                        + " from "
+                        + user.getName()
+                        + " ("
+                        + user.getAddress().toString()
+                        + ")");
 
         if (type == PacketType.Login.Client.LOGIN_START) {
-            var packet = new WrapperLoginClientLoginStart(event);
+            // Check for Floodgate player BEFORE parsing packet to avoid IndexOutOfBoundsException.
+            // Geyser/Bedrock clients may send packets in a format that packetevents can't parse
+            // correctly based on the server version (e.g., missing UUID for 1.20.2+ servers).
+            if (plugin.floodgateEnabled()) {
+                var floodgatePlayer = floodgateHelper.getFloodgatePlayer(event.getChannel());
+                if (floodgatePlayer != null) {
+                    String username = floodgatePlayer.getCorrectUsername();
+                    plugin.getLogger()
+                            .debug(
+                                    "Detected Floodgate player before packet parsing: "
+                                    + username
+                                    + " (XUID: "
+                                    + floodgatePlayer.getXuid()
+                                    + ")");
+
+                    if (Bukkit.getPlayer(username) != null) {
+                        kickPlayer(
+                                plugin.getMessages()
+                                        .getMessage(MessageKeys.KICK_ALREADY_CONNECTED.key()),
+                                user);
+                        return;
+                    }
+
+                    // Floodgate player - handle without parsing the packet
+                    // The UUID will be set by Floodgate
+                    receiveFakeStartPacket(username, null, event.getChannel(), UUID.randomUUID());
+                    return;
+                }
+            }
+
+            WrapperLoginClientLoginStart packet;
+            try {
+                packet = new WrapperLoginClientLoginStart(event);
+            } catch (IndexOutOfBoundsException e) {
+                // Geyser/Bedrock clients may send packets with a different format
+                // that packetevents can't parse correctly based on the server version.
+                // Let Floodgate handle these connections instead.
+                plugin.getLogger()
+                        .debug(
+                                "Could not parse login start packet (likely Geyser/Bedrock client):"
+                                + " "
+                                + e.getMessage());
+                return;
+            }
             var sessionKey = user.getAddress().toString();
 
             encryptionDataCache.invalidate(sessionKey);
@@ -390,8 +434,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
             } else {
                 var signature = packet.getSignatureData();
 
-                clientKey =
-                        signature.map(
+                clientKey
+                        = signature.map(
                                 data -> {
                                     var expires = data.getTimestamp();
                                     var key = data.getPublicKey();
@@ -426,8 +470,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                     try {
                         token = EncryptionUtil.generateVerifyToken(random);
 
-                        var newPacket =
-                                new WrapperLoginServerEncryptionRequest(
+                        var newPacket
+                                = new WrapperLoginServerEncryptionRequest(
                                         "", keyPair.getPublic(), token);
 
                         encryptionDataCache.put(
@@ -445,8 +489,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                         plugin.getLogger()
                                 .error(
                                         "Failed to send encryption begin packet for player "
-                                                + username
-                                                + "! Kicking player.");
+                                        + username
+                                        + "! Kicking player.");
                         e.printStackTrace();
                         kickPlayer("Internal error", user);
                     }
@@ -506,8 +550,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
             try {
                 // Use the new method that also captures skin data
-                var skinResult =
-                        hasJoinedWithSkin(username, serverId, address.getAddress(), data.uuid());
+                var skinResult
+                        = hasJoinedWithSkin(username, serverId, address.getAddress(), data.uuid());
                 if (skinResult != null) {
                     receiveFakeStartPacket(
                             username, data.publicKey(), event.getChannel(), data.uuid());
@@ -540,7 +584,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
     }
 
     /**
-     * fake a new login packet in order to let the server handle all the other stuff
+     * fake a new login packet in order to let the server handle all the other
+     * stuff
      *
      * @author games647 and FastLogin contributors
      */
@@ -548,21 +593,21 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
             String username, ClientPublicKey clientKey, Object channel, UUID uuid) {
         WrapperLoginClientLoginStart startPacket;
         if (getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_20)) {
-            startPacket =
-                    new WrapperLoginClientLoginStart(
+            startPacket
+                    = new WrapperLoginClientLoginStart(
                             getServerVersion().toClientVersion(),
                             username,
                             clientKey == null ? null : clientKey.toSignatureData(),
                             uuid);
         } else if (getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_19)) {
-            startPacket =
-                    new WrapperLoginClientLoginStart(
+            startPacket
+                    = new WrapperLoginClientLoginStart(
                             getServerVersion().toClientVersion(),
                             username,
                             clientKey == null ? null : clientKey.toSignatureData());
         } else {
-            startPacket =
-                    new WrapperLoginClientLoginStart(
+            startPacket
+                    = new WrapperLoginClientLoginStart(
                             getServerVersion().toClientVersion(), username);
         }
         PacketEvents.getAPI().getProtocolManager().receivePacketSilently(channel, startPacket);
@@ -571,7 +616,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
     /**
      * Verifies player session with Mojang and extracts skin data.
      *
-     * @return SkinData if verification successful and skin available, null if verification failed
+     * @return SkinData if verification successful and skin available, null if
+     * verification failed
      */
     public SkinData hasJoinedWithSkin(
             String username, String serverHash, InetAddress hostIp, UUID playerUuid)
@@ -579,14 +625,14 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         String url;
         if (hostIp instanceof Inet6Address
                 || plugin.getConfiguration().get(ConfigurationKeys.ALLOW_PROXY_CONNECTIONS)) {
-            url =
-                    String.format(
+            url
+                    = String.format(
                             "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s",
                             username, serverHash);
         } else {
             var encodedIP = URLEncoder.encode(hostIp.getHostAddress(), StandardCharsets.UTF_8);
-            url =
-                    String.format(
+            url
+                    = String.format(
                             "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s&ip=%s",
                             username, serverHash, encodedIP);
         }
@@ -604,8 +650,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
         // Read the response to extract skin data
         SkinData skinData = null;
-        try (BufferedReader reader =
-                new BufferedReader(
+        try (BufferedReader reader
+                = new BufferedReader(
                         new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
             StringBuilder response = new StringBuilder();
             String line;
@@ -621,10 +667,10 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                         var propObj = prop.getAsJsonObject();
                         if ("textures".equals(propObj.get("name").getAsString())) {
                             String value = propObj.get("value").getAsString();
-                            String signature =
-                                    propObj.has("signature")
-                                            ? propObj.get("signature").getAsString()
-                                            : null;
+                            String signature
+                                    = propObj.has("signature")
+                                    ? propObj.get("signature").getAsString()
+                                    : null;
                             skinData = new SkinData(value, signature);
 
                             // Cache the skin for application in onPreLogin
@@ -651,14 +697,14 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         String url;
         if (hostIp instanceof Inet6Address
                 || plugin.getConfiguration().get(ConfigurationKeys.ALLOW_PROXY_CONNECTIONS)) {
-            url =
-                    String.format(
+            url
+                    = String.format(
                             "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s",
                             username, serverHash);
         } else {
             var encodedIP = URLEncoder.encode(hostIp.getHostAddress(), StandardCharsets.UTF_8);
-            url =
-                    String.format(
+            url
+                    = String.format(
                             "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s&ip=%s",
                             username, serverHash, encodedIP);
         }
@@ -682,24 +728,24 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
             throws IllegalArgumentException {
         // Initialize method reflections
         if (encryptMethod == null) {
-            Class<?> networkManagerClass =
-                    SpigotReflectionUtil.getNetworkManagers().get(0).getClass();
+            Class<?> networkManagerClass
+                    = SpigotReflectionUtil.getNetworkManagers().get(0).getClass();
 
             // Try to get the old (pre MC 1.16.4) encryption method
-            encryptMethod =
-                    Reflection.getMethod(networkManagerClass, "setupEncryption", SecretKey.class);
+            encryptMethod
+                    = Reflection.getMethod(networkManagerClass, "setupEncryption", SecretKey.class);
 
             if (encryptMethod == null) {
                 // Try to get the new encryption method
-                encryptMethod =
-                        Reflection.getMethod(
+                encryptMethod
+                        = Reflection.getMethod(
                                 networkManagerClass, "setEncryptionKey", SecretKey.class);
             }
 
             if (encryptMethod == null) {
                 // Get the 1.16.4-1.21.0 encryption method
-                encryptMethod =
-                        Reflection.getMethod(
+                encryptMethod
+                        = Reflection.getMethod(
                                 networkManagerClass,
                                 "setEncryptionKey",
                                 Cipher.class,

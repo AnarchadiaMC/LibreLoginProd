@@ -6,22 +6,26 @@
 
 package xyz.kyngs.librelogin.paper;
 
+import org.geysermc.floodgate.api.player.FloodgatePlayer;
+
 import com.github.retrooper.packetevents.event.PacketReceiveEvent;
 import com.github.retrooper.packetevents.wrapper.login.client.WrapperLoginClientLoginStart;
+
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.util.AttributeKey;
-import org.geysermc.floodgate.api.player.FloodgatePlayer;
 
 public class FloodgateHelper {
 
     /**
-     * Reimplementation of the tasks injected Floodgate in ProtocolLib that are not run due to a bug
+     * Reimplementation of the tasks injected Floodgate in ProtocolLib that are
+     * not run due to a bug
      *
      * @param event the PacketEvent that won't be processed by Floodgate
      * @return false if the player was kicked
      * @author games647 and FastLogin contributors
-     * @see <a href="https://github.com/GeyserMC/Floodgate/issues/143">Issue Floodgate#143</a>
+     * @see <a href="https://github.com/GeyserMC/Floodgate/issues/143">Issue
+     * Floodgate#143</a>
      * @see <a
      *     href="https://github.com/GeyserMC/Floodgate/blob/5d5713ed9e9eeab0f4abdaa9cf5cd8619dc1909b/spigot/src/main/java/org/geysermc/floodgate/addon/data/SpigotDataHandler.java#L121-L175">Floodgate/SpigotDataHandler</a>
      */
@@ -53,9 +57,14 @@ public class FloodgateHelper {
     }
 
     /**
+     * Gets the FloodgatePlayer associated with a channel, if present. This can
+     * be used to detect Floodgate/Bedrock players before parsing packets.
+     *
+     * @param channel the Netty channel
+     * @return the FloodgatePlayer if present, null otherwise
      * @author games647 and FastLogin contributors
      */
-    private FloodgatePlayer getFloodgatePlayer(Object channel) {
+    public FloodgatePlayer getFloodgatePlayer(Object channel) {
         AttributeKey<FloodgatePlayer> floodgateAttribute = AttributeKey.valueOf("floodgate-player");
         return ((Channel) channel).attr(floodgateAttribute).get();
     }
