@@ -124,7 +124,7 @@ dependencies {
     compileOnly("dev.simplix:protocolize-api:2.4.2")
     libby("org.bouncycastle:bcprov-jdk18on:1.81")
     libby("org.apache.commons:commons-email:1.6.0")
-    libby("net.kyori:adventure-text-minimessage:4.25.0")
+    libby("net.kyori:adventure-text-minimessage:4.26.1")
     libby("com.github.kyngs:LegacyMessage:0.2.0")
 
     //Geyser
