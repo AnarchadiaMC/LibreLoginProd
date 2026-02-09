@@ -2,7 +2,7 @@ import org.cadixdev.gradle.licenser.LicenseProperties
 
 plugins {
     id("org.cadixdev.licenser") version "0.6.1"
-    id("com.diffplug.spotless") version "7.2.1"
+//    id("com.diffplug.spotless") version "7.2.1"
 }
 
 defaultTasks("updateLicenses", "shadowJar")
@@ -15,7 +15,7 @@ subprojects {
 
     apply {
         plugin("org.cadixdev.licenser")
-        plugin("com.diffplug.spotless")
+//        plugin("com.diffplug.spotless")
     }
 
     tasks.configureEach {
@@ -43,12 +43,12 @@ subprojects {
         });
     }
 
-    spotless {
-        java {
-            googleJavaFormat()
-                .aosp()
-                .reflowLongStrings()
-                .reorderImports(false)
-        }
-    }
+//     spotless {
+//         java {
+//             googleJavaFormat()
+//                 .aosp()
+//                 .reflowLongStrings()
+//                 .reorderImports(false)
+//         }
+//     }
 }
