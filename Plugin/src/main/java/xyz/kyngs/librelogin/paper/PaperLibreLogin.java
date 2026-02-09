@@ -120,8 +120,9 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
     @Override
     protected void disable() {
         PacketEvents.getAPI().terminate();
-        if (getDatabaseProvider() == null) return; // Not initialized
-
+        if (getDatabaseProvider() == null) {
+            return; // Not initialized
+        }
         super.disable();
     }
 
@@ -134,27 +135,28 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
             getLogger()
                     .error(
                             "!!!The server is running in online mode! LibreLogin won't start unless"
-                                    + " you set it to false!!!");
+                            + " you set it to false!!!");
             disable();
             return;
         }
 
         boolean isBehindProxy;
-        if (getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_21_4))
-            isBehindProxy = Bukkit.getServer().getServerConfig().isProxyEnabled();
-        else
-            isBehindProxy =
-                    Bukkit.spigot().getSpigotConfig().getBoolean("settings.bungeecord")
-                            || Bukkit.spigot()
-                                    .getPaperConfig()
-                                    .getBoolean("settings.velocity-support.enabled");
+        if (getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_21_4)) {
+            isBehindProxy = Bukkit.getServer().getServerConfig().isProxyEnabled(); 
+        }else {
+            isBehindProxy
+                    = Bukkit.spigot().getSpigotConfig().getBoolean("settings.bungeecord")
+                    || Bukkit.spigot()
+                            .getPaperConfig()
+                            .getBoolean("settings.velocity-support.enabled");
+        }
 
         if (isBehindProxy) {
             getLogger().error("!!!This server is running under a proxy, LibreLogin won't start!!!");
             getLogger()
                     .error(
                             "If you want to use LibreLogin under a proxy, place it on the proxy and"
-                                    + " remove it from the server.");
+                            + " remove it from the server.");
             disable();
             return;
         }
@@ -171,7 +173,9 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
                 provider.getTypes().authenticated,
                 event -> {
                     var player = event.getPlayer();
-                    if (player == null) return;
+                    if (player == null) {
+                        return;
+                    }
                     player.setInvisible(false);
                 });
 
@@ -191,7 +195,7 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
             getLogger()
                     .debug(
                             "AsyncPlayerSpawnLocationEvent not available, using"
-                                    + " PlayerSpawnLocationEvent fallback");
+                            + " PlayerSpawnLocationEvent fallback");
         }
 
         PacketEvents.getAPI().getEventManager().registerListener(new PacketListener(listeners));
@@ -204,21 +208,22 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
         try {
 
             var location = listeners.getSpawnLocationCache().getIfPresent(player.getUniqueId());
+            boolean isNewPlayer = (location == null);
 
             // Safety check: NEVER teleport to a limbo world after authentication
             // This is defense-in-depth in case the caching logic fails or cache has stale data
             if (location != null) {
-                var limboWorlds =
-                        getConfiguration()
+                var limboWorlds
+                        = getConfiguration()
                                 .get(xyz.kyngs.librelogin.common.config.ConfigurationKeys.LIMBO);
                 if (limboWorlds.contains(location.getWorld().getName())) {
                     getLogger()
                             .warn(
                                     "Safety check triggered: Cached location for "
-                                            + player.getName()
-                                            + " was in limbo world "
-                                            + location.getWorld().getName()
-                                            + ". Forcing lobby spawn.");
+                                    + player.getName()
+                                    + " was in limbo world "
+                                    + location.getWorld().getName()
+                                    + ". Forcing lobby spawn.");
                     listeners.getSpawnLocationCache().invalidate(player.getUniqueId());
                     location = null; // Force fallback to lobby
                 }
@@ -234,11 +239,27 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
 
                 location = world.getSpawnLocation();
             } else {
+                isNewPlayer = false; // Has cached location, not a new player
                 listeners.getSpawnLocationCache().invalidate(player.getUniqueId());
             }
 
             var finalLocation = location;
             PaperUtil.runSyncAndWait(() -> player.teleportAsync(finalLocation), this);
+
+            // Execute RTP command for new players without saved location
+            if (isNewPlayer
+                    && getConfiguration()
+                            .get(xyz.kyngs.librelogin.common.config.ConfigurationKeys.NEW_PLAYER_RTP_ENABLED)) {
+                var command
+                        = getConfiguration()
+                                .get(xyz.kyngs.librelogin.common.config.ConfigurationKeys.NEW_PLAYER_RTP_COMMAND)
+                                .replace("{player}", player.getName());
+                getLogger().info("Executing RTP command for new player " + player.getName());
+                Bukkit.getScheduler()
+                        .runTask(
+                                getBootstrap(),
+                                () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command));
+            }
 
         } catch (EventCancelledException ignored) {
         }
@@ -246,16 +267,16 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
 
     @Override
     public CancellableTask delay(Runnable runnable, long delayInMillis) {
-        var task =
-                Bukkit.getScheduler()
+        var task
+                = Bukkit.getScheduler()
                         .runTaskLaterAsynchronously(bootstrap, runnable, delayInMillis / 50);
         return task::cancel;
     }
 
     @Override
     public CancellableTask repeat(Runnable runnable, long delayInMillis, long repeatInMillis) {
-        var task =
-                Bukkit.getScheduler()
+        var task
+                = Bukkit.getScheduler()
                         .runTaskTimerAsynchronously(
                                 bootstrap, runnable, delayInMillis / 50, repeatInMillis / 50);
         return task::cancel;

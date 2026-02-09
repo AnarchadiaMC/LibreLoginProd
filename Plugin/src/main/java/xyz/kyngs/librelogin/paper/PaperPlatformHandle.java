@@ -55,7 +55,9 @@ public class PaperPlatformHandle implements PlatformHandle<Player, World> {
     public World getServer(String name, boolean limbo) {
         var world = Bukkit.getWorld(name);
 
-        if (world != null) return world;
+        if (world != null) {
+            return world;
+        }
 
         var file = new File(name);
         var exists = file.exists();
@@ -69,7 +71,12 @@ public class PaperPlatformHandle implements PlatformHandle<Player, World> {
         var creator = new WorldCreator(name);
 
         if (limbo) {
+            // Generate End sky datapack for new limbo worlds
+            if (!exists) {
+                LimboDatapackGenerator.generateDatapack(name, plugin.getBootstrap());
+            }
             creator.generator("librelogin:void");
+            creator.environment(World.Environment.THE_END);
         }
 
         world = Bukkit.createWorld(creator);
@@ -77,8 +84,9 @@ public class PaperPlatformHandle implements PlatformHandle<Player, World> {
         if (limbo) {
             world.setSpawnLocation(
                     new Location(world, 0.5, world.getHighestBlockYAt(0, 0) + 1, 0.5));
-            if (getServerVersion().isOlderThan(ServerVersion.V_1_21_9))
+            if (getServerVersion().isOlderThan(ServerVersion.V_1_21_9)) {
                 world.setKeepSpawnInMemory(true);
+            }
             if (getServerVersion().isOlderThan(ServerVersion.V_1_21_11)) {
                 world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
                 world.setGameRule(GameRule.DO_INSOMNIA, false);
@@ -153,16 +161,16 @@ public class PaperPlatformHandle implements PlatformHandle<Player, World> {
                 getServers().stream().map(this::fromWorld).toList(),
                 Arrays.stream(Bukkit.getPluginManager().getPlugins())
                         .map(
-                                plugin ->
-                                        MoreObjects.toStringHelper(plugin)
-                                                .add("name", plugin.getName())
-                                                .add(
-                                                        "version",
-                                                        plugin.getDescription().getVersion())
-                                                .add(
-                                                        "authors",
-                                                        plugin.getDescription().getAuthors())
-                                                .toString())
+                                plugin
+                                -> MoreObjects.toStringHelper(plugin)
+                                        .add("name", plugin.getName())
+                                        .add(
+                                                "version",
+                                                plugin.getDescription().getVersion())
+                                        .add(
+                                                "authors",
+                                                plugin.getDescription().getAuthors())
+                                        .toString())
                         .toList(),
                 plugin.getServerHandler().getLimboServers().stream().map(this::fromWorld).toList(),
                 plugin.getServerHandler().getLobbyServers().values().stream()

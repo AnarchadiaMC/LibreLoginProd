@@ -416,4 +416,20 @@ Verifies whether the IP the players had used when authenticating to Mojang match
                     "!!THIS OPTION IS IRRELEVANT WHEN USING PAPER!! Defines port(s) that limbo"
                     + " server can be bounded to.",
                     ConfigurateHelper::getString);
+
+    public static final ConfigurationKey<Boolean> NEW_PLAYER_RTP_ENABLED
+            = new ConfigurationKey<>(
+                    "new-player-rtp.enabled",
+                    false,
+                    "Execute an RTP command for new players who have no saved location after"
+                    + " authentication. Useful with plugins like UnexpectedSpawn.",
+                    ConfigurateHelper::getBoolean);
+
+    public static final ConfigurationKey<String> NEW_PLAYER_RTP_COMMAND
+            = new ConfigurationKey<>(
+                    "new-player-rtp.command",
+                    "uns rtp p:{player}",
+                    "The command to execute for new player RTP. Use {player} as a placeholder for"
+                    + " the player's name. The command runs from console.",
+                    ConfigurateHelper::getString);
 }
