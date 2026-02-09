@@ -17,10 +17,10 @@ A powerful, multiplatform Minecraft authentication plugin for both **Paper** and
 - **Geyser/Floodgate Integration** - Seamless Bedrock Edition support with automatic player detection
 
 ### ✨ Premium Features
-- **Premium Account Linking** - Link cracked accounts to Mojang profiles for auto-login
+- **Premium Account Linking** - Link offline accounts to Mojang profiles for auto-login
 - **Auto-Registration** - Optional automatic registration for premium usernames
 - **Skin Restoration** - Automatically restores premium player skins after authentication
-- **UUID Management** - Multiple UUID creators: RANDOM, CRACKED, or MOJANG-based
+- **UUID Management** - Multiple UUID creators: RANDOM, OFFLINE, or MOJANG-based
 
 ### � Database Support
 - **MySQL** - Full MySQL database support

@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
 package xyz.kyngs.librelogin.common.command.commands.premium;
 
 import co.aikar.commands.annotation.*;
@@ -30,7 +29,7 @@ public class PremiumEnableCommand<P> extends PremiumCommand<P> {
         return runAsync(
                 () -> {
                     var user = getUser(player);
-                    checkCracked(user);
+                    checkOffline(user);
 
                     var hashed = user.getHashedPassword();
                     var crypto = getCrypto(hashed);

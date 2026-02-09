@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
 package xyz.kyngs.librelogin.common;
 
 import static xyz.kyngs.librelogin.common.config.ConfigurationKeys.*;
@@ -84,8 +83,8 @@ import xyz.kyngs.librelogin.common.util.GeneralUtil;
 public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S> {
 
     public static final Gson GSON = new Gson();
-    public static final DateTimeFormatter DATE_TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("dd. MM. yyyy HH:mm");
+    public static final DateTimeFormatter DATE_TIME_FORMATTER
+            = DateTimeFormatter.ofPattern("dd. MM. yyyy HH:mm");
     public static final ExecutorService EXECUTOR;
 
     static {
@@ -244,7 +243,9 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
 
     protected void enable() {
         version = SemanticVersion.parse(getVersion());
-        if (logger == null) logger = provideLogger();
+        if (logger == null) {
+            logger = provideLogger();
+        }
 
         try {
             new Log4JFilter().inject();
@@ -260,12 +261,12 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
 
         var folder = getDataFolder();
         if (!folder.exists()) {
-            var oldFolder =
-                    new File(
+            var oldFolder
+                    = new File(
                             folder.getParentFile(),
                             folder.getName().equals("librelogin")
-                                    ? "librepremium"
-                                    : "LibrePremium");
+                            ? "librepremium"
+                            : "LibrePremium");
             if (oldFolder.exists()) {
                 logger.info("Migrating configuration and messages from old folder...");
                 if (!oldFolder.renameTo(folder)) {
@@ -316,7 +317,7 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
             e.printStackTrace();
             logger.info(
                     "An unknown exception occurred while attempting to load the forbidden"
-                            + " passwords, this most likely isn't your fault");
+                    + " passwords, this most likely isn't your fault");
             shutdownProxy(1);
         }
 
@@ -352,7 +353,7 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
             logger.warn("!! YOU ARE RUNNING A DEVELOPMENT BUILD OF LIBRELOGIN !!");
             logger.warn(
                     "!! THIS IS NOT A RELEASE, USE THIS ONLY IF YOU WERE INSTRUCTED TO DO SO. DO"
-                            + " NOT USE THIS IN PRODUCTION !!");
+                    + " NOT USE THIS IN PRODUCTION !!");
         } else {
             initMetrics();
         }
@@ -403,8 +404,8 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
                     shutdownProxy(1);
                 }
 
-                connector =
-                        connectorRegistration
+                connector
+                        = connectorRegistration
                                 .factory()
                                 .apply("database.properties." + connectorRegistration.id() + ".");
 
@@ -463,7 +464,7 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
             e.printStackTrace();
             logger.info(
                     "An unknown exception occurred while attempting to load the messages, this most"
-                            + " likely isn't your fault");
+                    + " likely isn't your fault");
             shutdownProxy(1);
         } catch (CorruptedConfigurationException e) {
             var cause = GeneralUtil.getFurthestCause(e);
@@ -479,7 +480,9 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
         var defaults = new ArrayList<BiHolder<Class<?>, String>>();
 
         for (DatabaseConnectorRegistration<?, ?> value : databaseConnectors.values()) {
-            if (value.configClass() == null) continue;
+            if (value.configClass() == null) {
+                continue;
+            }
             defaults.add(
                     new BiHolder<>(value.configClass(), "database.properties." + value.id() + "."));
             defaults.add(
@@ -493,7 +496,7 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
             if (configuration.reload(this)) {
                 logger.warn(
                         "!! A new configuration was generated, please fill it out, if in doubt, see"
-                                + " the wiki !!");
+                        + " the wiki !!");
                 shutdownProxy(0);
             }
 
@@ -511,7 +514,7 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
             e.printStackTrace();
             logger.info(
                     "An unknown exception occurred while attempting to load the configuration, this"
-                            + " most likely isn't your fault");
+                    + " most likely isn't your fault");
             shutdownProxy(1);
         } catch (CorruptedConfigurationException e) {
             var cause = GeneralUtil.getFurthestCause(e);
@@ -560,29 +563,29 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
                         PostgreSQLDatabaseConnector.class));
         registerReadProvider(
                 new ReadDatabaseProviderRegistration<>(
-                        connector ->
-                                new AegisSQLMigrateReadProvider(
-                                        configuration.get(MIGRATION_MYSQL_OLD_DATABASE_TABLE),
-                                        logger,
-                                        connector),
+                        connector
+                        -> new AegisSQLMigrateReadProvider(
+                                configuration.get(MIGRATION_MYSQL_OLD_DATABASE_TABLE),
+                                logger,
+                                connector),
                         "aegis-mysql",
                         MySQLDatabaseConnector.class));
         registerReadProvider(
                 new ReadDatabaseProviderRegistration<>(
-                        connector ->
-                                new AuthMeSQLMigrateReadProvider(
-                                        configuration.get(MIGRATION_MYSQL_OLD_DATABASE_TABLE),
-                                        logger,
-                                        connector),
+                        connector
+                        -> new AuthMeSQLMigrateReadProvider(
+                                configuration.get(MIGRATION_MYSQL_OLD_DATABASE_TABLE),
+                                logger,
+                                connector),
                         "authme-mysql",
                         MySQLDatabaseConnector.class));
         registerReadProvider(
                 new ReadDatabaseProviderRegistration<>(
-                        connector ->
-                                new AuthMeSQLMigrateReadProvider(
-                                        configuration.get(MIGRATION_POSTGRESQL_OLD_DATABASE_TABLE),
-                                        logger,
-                                        connector),
+                        connector
+                        -> new AuthMeSQLMigrateReadProvider(
+                                configuration.get(MIGRATION_POSTGRESQL_OLD_DATABASE_TABLE),
+                                logger,
+                                connector),
                         "authme-postgresql",
                         PostgreSQLDatabaseConnector.class));
         registerReadProvider(
@@ -592,20 +595,20 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
                         SQLiteDatabaseConnector.class));
         registerReadProvider(
                 new ReadDatabaseProviderRegistration<>(
-                        connector ->
-                                new DBASQLMigrateReadProvider(
-                                        configuration.get(MIGRATION_MYSQL_OLD_DATABASE_TABLE),
-                                        logger,
-                                        connector),
+                        connector
+                        -> new DBASQLMigrateReadProvider(
+                                configuration.get(MIGRATION_MYSQL_OLD_DATABASE_TABLE),
+                                logger,
+                                connector),
                         "dba-mysql",
                         MySQLDatabaseConnector.class));
         registerReadProvider(
                 new ReadDatabaseProviderRegistration<>(
-                        connector ->
-                                new JPremiumSQLMigrateReadProvider(
-                                        configuration.get(MIGRATION_MYSQL_OLD_DATABASE_TABLE),
-                                        logger,
-                                        connector),
+                        connector
+                        -> new JPremiumSQLMigrateReadProvider(
+                                configuration.get(MIGRATION_MYSQL_OLD_DATABASE_TABLE),
+                                logger,
+                                connector),
                         "jpremium-mysql",
                         MySQLDatabaseConnector.class));
         registerReadProvider(
@@ -620,45 +623,45 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
                         MySQLDatabaseConnector.class));
         registerReadProvider(
                 new ReadDatabaseProviderRegistration<>(
-                        connector ->
-                                new FastLoginSQLMigrateReadProvider(
-                                        "premium",
-                                        logger,
-                                        connector,
-                                        databaseConnector,
-                                        premiumProvider),
+                        connector
+                        -> new FastLoginSQLMigrateReadProvider(
+                                "premium",
+                                logger,
+                                connector,
+                                databaseConnector,
+                                premiumProvider),
                         "fastlogin-mysql",
                         MySQLDatabaseConnector.class));
         registerReadProvider(
                 new ReadDatabaseProviderRegistration<>(
-                        connector ->
-                                new FastLoginSQLMigrateReadProvider(
-                                        "premium",
-                                        logger,
-                                        connector,
-                                        databaseConnector,
-                                        premiumProvider),
+                        connector
+                        -> new FastLoginSQLMigrateReadProvider(
+                                "premium",
+                                logger,
+                                connector,
+                                databaseConnector,
+                                premiumProvider),
                         "fastlogin-sqlite",
                         SQLiteDatabaseConnector.class));
         registerReadProvider(
                 new ReadDatabaseProviderRegistration<>(
-                        connector ->
-                                new UniqueCodeAuthSQLMigrateReadProvider(
-                                        "uniquecode_proxy_users", logger, connector, this),
+                        connector
+                        -> new UniqueCodeAuthSQLMigrateReadProvider(
+                                "uniquecode_proxy_users", logger, connector, this),
                         "uniquecodeauth-mysql",
                         MySQLDatabaseConnector.class));
         registerReadProvider(
                 new ReadDatabaseProviderRegistration<>(
-                        connector ->
-                                new LoginSecuritySQLMigrateReadProvider(
-                                        "ls_players", logger, connector),
+                        connector
+                        -> new LoginSecuritySQLMigrateReadProvider(
+                                "ls_players", logger, connector),
                         "loginsecurity-mysql",
                         MySQLDatabaseConnector.class));
         registerReadProvider(
                 new ReadDatabaseProviderRegistration<>(
-                        connector ->
-                                new LoginSecuritySQLMigrateReadProvider(
-                                        "ls_players", logger, connector),
+                        connector
+                        -> new LoginSecuritySQLMigrateReadProvider(
+                                "ls_players", logger, connector),
                         "loginsecurity-sqlite",
                         SQLiteDatabaseConnector.class));
         registerReadProvider(
@@ -678,11 +681,11 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
                         SQLiteDatabaseConnector.class));
         registerReadProvider(
                 new ReadDatabaseProviderRegistration<>(
-                        connector ->
-                                new LogItSQLMigrateReadProvider(
-                                        configuration.get(MIGRATION_MYSQL_OLD_DATABASE_TABLE),
-                                        logger,
-                                        connector),
+                        connector
+                        -> new LogItSQLMigrateReadProvider(
+                                configuration.get(MIGRATION_MYSQL_OLD_DATABASE_TABLE),
+                                logger,
+                                connector),
                         "logit-mysql",
                         MySQLDatabaseConnector.class));
         // Currently disabled as crazylogin stores all names in lowercase
@@ -698,10 +701,10 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
 
         if (!file.exists()) {
             logger.info("Forbidden passwords list doesn't exist, downloading...");
-            try (BufferedInputStream in =
-                    new BufferedInputStream(
+            try (BufferedInputStream in
+                    = new BufferedInputStream(
                             new URL(
-                                            "https://raw.githubusercontent.com/kyngs/LibreLogin/dev/forbidden-passwords.txt")
+                                    "https://raw.githubusercontent.com/kyngs/LibreLogin/dev/forbidden-passwords.txt")
                                     .openStream())) {
                 if (!file.createNewFile()) {
                     throw new IOException("Failed to create file");
@@ -736,8 +739,8 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
         logger.info("Checking for updates...");
 
         try {
-            var connection =
-                    new URL("https://api.github.com/repos/Navio1430/LibreLoginProd/releases")
+            var connection
+                    = new URL("https://api.github.com/repos/Navio1430/LibreLoginProd/releases")
                             .openConnection();
 
             connection.setRequestProperty("User-Agent", "LibreLogin");
@@ -756,16 +759,19 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
 
                 var version = SemanticVersion.parse(release.get("tag_name").getAsString());
 
-                if (latest == null) latest = version;
+                if (latest == null) {
+                    latest = version;
+                }
 
-                var shouldBreak =
-                        switch (this.version.compare(version)) {
-                            case 0, 1 -> true;
-                            default -> {
-                                behind.add(new Release(version, release.get("name").getAsString()));
-                                yield false;
-                            }
-                        };
+                var shouldBreak
+                        = switch (this.version.compare(version)) {
+                    case 0, 1 ->
+                        true;
+                    default -> {
+                        behind.add(new Release(version, release.get("name").getAsString()));
+                        yield false;
+                    }
+                };
 
                 if (shouldBreak) {
                     break;
@@ -792,9 +798,12 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
 
     public UUID generateNewUUID(String name, @Nullable UUID premiumID) {
         return switch (configuration.getNewUUIDCreator()) {
-            case RANDOM -> UUID.randomUUID();
-            case MOJANG -> premiumID == null ? GeneralUtil.getCrackedUUIDFromName(name) : premiumID;
-            case CRACKED -> GeneralUtil.getCrackedUUIDFromName(name);
+            case RANDOM ->
+                UUID.randomUUID();
+            case MOJANG ->
+                premiumID == null ? GeneralUtil.getOfflineUUIDFromName(name) : premiumID;
+            case OFFLINE ->
+                GeneralUtil.getOfflineUUIDFromName(name);
         };
     }
 
@@ -830,8 +839,11 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
     public void checkDataFolder() {
         var folder = getDataFolder();
 
-        if (!folder.exists())
-            if (!folder.mkdir()) throw new RuntimeException("Failed to create datafolder");
+        if (!folder.exists()) {
+            if (!folder.mkdir()) {
+                throw new RuntimeException("Failed to create datafolder");
+            }
+        }
     }
 
     protected abstract Logger provideLogger();
@@ -859,9 +871,11 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
                     getMessages()
                             .getMessage(
                                     switch (e.getIssue()) {
-                                        case THROTTLED -> "error-premium-throttled";
-                                        default -> "error-premium-unknown";
-                                    }));
+                                case THROTTLED ->
+                                    "error-premium-throttled";
+                                default ->
+                                    "error-premium-unknown";
+                            }));
         }
     }
 
@@ -908,7 +922,9 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
         cancelOnExit.removeAll(player).forEach(CancellableTask::cancel);
         if (configuration.get(REMEMBER_LAST_SERVER)) {
             var server = platformHandle.getPlayersServerName(player);
-            if (server == null) return;
+            if (server == null) {
+                return;
+            }
             var user = databaseProvider.getByUUID(platformHandle.getUUIDForPlayer(player));
             if (user != null && !getConfiguration().get(LIMBO).contains(server)) {
                 user.setLastServer(server);
@@ -953,8 +969,8 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
         if (mainThread()) {
             logger.error(
                     "AN IO OPERATION IS BEING PERFORMED ON THE MAIN THREAD! THIS IS A SERIOUS BUG!,"
-                            + " PLEASE REPORT IT TO THE DEVELOPER OF THE PLUGIN AND ATTACH THE"
-                            + " STACKTRACE BELOW!");
+                    + " PLEASE REPORT IT TO THE DEVELOPER OF THE PLUGIN AND ATTACH THE"
+                    + " STACKTRACE BELOW!");
             new Throwable().printStackTrace();
         }
     }

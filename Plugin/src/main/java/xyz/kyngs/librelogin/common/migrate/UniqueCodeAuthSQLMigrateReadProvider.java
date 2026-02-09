@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
 package xyz.kyngs.librelogin.common.migrate;
 
 import java.util.Collection;
@@ -43,31 +42,31 @@ public class UniqueCodeAuthSQLMigrateReadProvider extends SQLMigrateReadProvider
                     while (rs.next()) {
                         try {
                             var name = rs.getString("name");
-                            var password =
-                                    rs.getString(
-                                            "password"); // Unfortunately, this godforsaken plugin
+                            var password
+                            = rs.getString(
+                                    "password"); // Unfortunately, this godforsaken plugin
                             // stores passwords in plain text
                             var premium = rs.getBoolean("premium");
 
-                            if (password.equals("n"))
+                            if (password.equals("n")) {
                                 password = null; // The horrible plugin uses "n" as an indicator for
-                            // null, makes me think what happens when someone uses
+                            }                            // null, makes me think what happens when someone uses
                             // "n" as a password
 
-                            var hashed =
-                                    password == null
-                                            ? null
-                                            : plugin.getDefaultCryptoProvider()
-                                                    .createHash(password);
+                            var hashed
+                            = password == null
+                                    ? null
+                                    : plugin.getDefaultCryptoProvider()
+                                            .createHash(password);
 
-                            var uuid = GeneralUtil.getCrackedUUIDFromName(name);
+                            var uuid = GeneralUtil.getOfflineUUIDFromName(name);
                             UUID premiumUUID = null;
 
                             if (premium) {
                                 logger.info("Attempting to get premium UUID for " + name);
                                 try {
-                                    var premiumUser =
-                                            plugin.getPremiumProvider().getUserForName(name);
+                                    var premiumUser
+                                    = plugin.getPremiumProvider().getUserForName(name);
                                     if (premiumUser == null) {
                                         logger.warn(
                                                 "User " + name + " is no longer premium, skipping");
@@ -78,9 +77,9 @@ public class UniqueCodeAuthSQLMigrateReadProvider extends SQLMigrateReadProvider
                                 } catch (PremiumException e) {
                                     logger.error(
                                             "Error while getting premium UUID for "
-                                                    + name
-                                                    + ": "
-                                                    + e.getMessage());
+                                            + name
+                                            + ": "
+                                            + e.getMessage());
                                 }
                             }
 

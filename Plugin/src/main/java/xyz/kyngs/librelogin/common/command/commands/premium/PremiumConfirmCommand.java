@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
 package xyz.kyngs.librelogin.common.command.commands.premium;
 
 import co.aikar.commands.annotation.CommandAlias;
@@ -14,6 +13,7 @@ import xyz.kyngs.librelogin.common.AuthenticLibreLogin;
 
 @CommandAlias("premiumconfirm|confirmpremium")
 public class PremiumConfirmCommand<P> extends PremiumCommand<P> {
+
     public PremiumConfirmCommand(AuthenticLibreLogin<P, ?> plugin) {
         super(plugin);
     }
@@ -23,7 +23,7 @@ public class PremiumConfirmCommand<P> extends PremiumCommand<P> {
         return runAsync(
                 () -> {
                     var user = getUser(player);
-                    checkCracked(user);
+                    checkOffline(user);
 
                     plugin.getCommandProvider().onConfirm(player, sender, user);
                 });

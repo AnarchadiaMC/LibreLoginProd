@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
 package xyz.kyngs.librelogin.common.migrate;
 
 import java.sql.Timestamp;
@@ -41,7 +40,9 @@ public class AuthMeSQLMigrateReadProvider extends SQLMigrateReadProvider {
                             var lastSeen = rs.getLong("lastlogin");
                             var firstSeen = rs.getLong("regdate");
 
-                            if (nickname == null) continue;
+                            if (nickname == null) {
+                                continue;
+                            }
 
                             HashedPassword password = null;
 
@@ -64,7 +65,7 @@ public class AuthMeSQLMigrateReadProvider extends SQLMigrateReadProvider {
 
                             users.add(
                                     new AuthenticUser(
-                                            GeneralUtil.getCrackedUUIDFromName(nickname),
+                                            GeneralUtil.getOfflineUUIDFromName(nickname),
                                             null,
                                             password,
                                             nickname,

@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
 package xyz.kyngs.librelogin.common.migrate;
 
 import java.util.Collection;
@@ -38,7 +37,9 @@ public class CrazyLoginSQLMigrateReadProvider extends SQLMigrateReadProvider {
                             var passwordRaw = rs.getString("password");
                             var lastSeen = rs.getTimestamp("lastAction");
 
-                            if (nickname == null) continue;
+                            if (nickname == null) {
+                                continue;
+                            }
 
                             HashedPassword password = null;
 
@@ -59,7 +60,7 @@ public class CrazyLoginSQLMigrateReadProvider extends SQLMigrateReadProvider {
 
                             users.add(
                                     new AuthenticUser(
-                                            GeneralUtil.getCrackedUUIDFromName(nickname),
+                                            GeneralUtil.getOfflineUUIDFromName(nickname),
                                             null,
                                             password,
                                             nickname,

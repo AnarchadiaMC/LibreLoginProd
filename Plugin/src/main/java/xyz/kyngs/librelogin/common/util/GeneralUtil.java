@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
 package xyz.kyngs.librelogin.common.util;
 
 import static xyz.kyngs.librelogin.common.config.ConfigurationKeys.DATABASE_TYPE;
@@ -47,7 +46,9 @@ public class GeneralUtil {
         while (true) {
             var cause = throwable.getCause();
 
-            if (cause == null) return throwable;
+            if (cause == null) {
+                return throwable;
+            }
 
             throwable = cause;
         }
@@ -64,21 +65,24 @@ public class GeneralUtil {
     @Nullable
     public static TextComponent formatComponent(
             @Nullable TextComponent component, Map<String, String> replacements) {
-        if (component == null) return null;
+        if (component == null) {
+            return null;
+        }
 
         for (Map.Entry<String, String> entry : replacements.entrySet()) {
-            component =
-                    (TextComponent)
-                            component.replaceText(
-                                    builder ->
-                                            builder.matchLiteral(entry.getKey())
-                                                    .replacement(entry.getValue()));
+            component
+                    = (TextComponent) component.replaceText(
+                            builder
+                            -> builder.matchLiteral(entry.getKey())
+                                    .replacement(entry.getValue()));
         }
         return component;
     }
 
-    public static UUID getCrackedUUIDFromName(String name) {
-        if (name == null) return null;
+    public static UUID getOfflineUUIDFromName(String name) {
+        if (name == null) {
+            return null;
+        }
         return UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(StandardCharsets.UTF_8));
     }
 
@@ -96,8 +100,8 @@ public class GeneralUtil {
                 DatabaseConnector<?, ?> connector = null;
 
                 try {
-                    var registration =
-                            plugin.getReadProviders().get(configuration.get(MIGRATION_TYPE));
+                    var registration
+                            = plugin.getReadProviders().get(configuration.get(MIGRATION_TYPE));
                     if (registration == null) {
                         logger.error(
                                 "Migration type %s doesn't exist, please check your configuration"
@@ -107,8 +111,8 @@ public class GeneralUtil {
                     }
 
                     if (registration.databaseConnector() != null) {
-                        var connectorRegistration =
-                                plugin.getDatabaseConnector(registration.databaseConnector());
+                        var connectorRegistration
+                                = plugin.getDatabaseConnector(registration.databaseConnector());
 
                         if (connectorRegistration == null) {
                             logger.error(
@@ -118,13 +122,13 @@ public class GeneralUtil {
                             return;
                         }
 
-                        connector =
-                                connectorRegistration
+                        connector
+                                = connectorRegistration
                                         .factory()
                                         .apply(
                                                 "migration.old-database."
-                                                        + connectorRegistration.id()
-                                                        + ".");
+                                                + connectorRegistration.id()
+                                                + ".");
 
                         connector.connect();
                     }
@@ -153,14 +157,16 @@ public class GeneralUtil {
                     logger.info("Migration complete, cleaning up!");
 
                 } finally {
-                    if (connector != null) connector.disconnect();
+                    if (connector != null) {
+                        connector.disconnect();
+                    }
                 }
 
             } catch (Exception e) {
                 e.printStackTrace();
                 logger.error(
                         "An unexpected exception occurred while performing database migration,"
-                                + " aborting migration");
+                        + " aborting migration");
             }
         }
     }
@@ -186,7 +192,9 @@ public class GeneralUtil {
         var list = new ArrayList<ConfigurationKey<?>>();
         try {
             for (Field field : clazz.getFields()) {
-                if (field.getType() != ConfigurationKey.class) continue;
+                if (field.getType() != ConfigurationKey.class) {
+                    continue;
+                }
                 list.add((ConfigurationKey<?>) field.get(null));
             }
         } catch (IllegalAccessException e) {

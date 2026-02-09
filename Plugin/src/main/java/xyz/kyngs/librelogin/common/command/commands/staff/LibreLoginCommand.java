@@ -3,15 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
 package xyz.kyngs.librelogin.common.command.commands.staff;
 
-import static xyz.kyngs.librelogin.common.AuthenticLibreLogin.DATE_TIME_FORMATTER;
-import static xyz.kyngs.librelogin.common.AuthenticLibreLogin.GSON;
-
-import co.aikar.commands.annotation.*;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -21,11 +14,23 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletionStage;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+
+import co.aikar.commands.annotation.CommandAlias;
+import co.aikar.commands.annotation.CommandCompletion;
+import co.aikar.commands.annotation.CommandPermission;
+import co.aikar.commands.annotation.Default;
+import co.aikar.commands.annotation.Subcommand;
+import co.aikar.commands.annotation.Syntax;
 import net.kyori.adventure.audience.Audience;
 import xyz.kyngs.librelogin.api.configuration.CorruptedConfigurationException;
 import xyz.kyngs.librelogin.api.database.User;
 import xyz.kyngs.librelogin.api.event.events.AuthenticatedEvent;
 import xyz.kyngs.librelogin.common.AuthenticLibreLogin;
+import static xyz.kyngs.librelogin.common.AuthenticLibreLogin.DATE_TIME_FORMATTER;
+import static xyz.kyngs.librelogin.common.AuthenticLibreLogin.GSON;
 import xyz.kyngs.librelogin.common.command.InvalidCommandArgument;
 import xyz.kyngs.librelogin.common.database.AuthenticUser;
 import xyz.kyngs.librelogin.common.event.events.AuthenticPasswordChangeEvent;
@@ -43,9 +48,9 @@ public class LibreLoginCommand<P> extends StaffCommand<P> {
     @Default
     public CompletionStage<Void> onAbout(Audience audience) {
         return runAsync(
-                () ->
-                        audience.sendMessage(
-                                getMessage("info-about", "%version%", plugin.getVersion())));
+                ()
+                -> audience.sendMessage(
+                        getMessage("info-about", "%version%", plugin.getVersion())));
     }
 
     @Subcommand("email test")
@@ -55,9 +60,10 @@ public class LibreLoginCommand<P> extends StaffCommand<P> {
     public CompletionStage<Void> onEmailTest(Audience audience, String email) {
         return runAsync(
                 () -> {
-                    if (plugin.getEmailHandler() == null)
+                    if (plugin.getEmailHandler() == null) {
                         throw new InvalidCommandArgument(
                                 getMessage("error-password-resetting-disabled"));
+                    }
                     audience.sendMessage(getMessage("info-sending-email"));
                     plugin.getEmailHandler().sendTestMail(email);
                     audience.sendMessage(getMessage("info-sent-email"));
@@ -77,15 +83,15 @@ public class LibreLoginCommand<P> extends StaffCommand<P> {
                         dumpFolder.mkdirs();
                     }
 
-                    var dumpFile =
-                            new File(
-                                    dumpFolder,
-                                    "dump-%date%.json"
-                                            .replace(
-                                                    "%date%",
-                                                    DateTimeFormatter.ofPattern(
-                                                                    "dd-MM-yyyy_HH-mm-ss")
-                                                            .format(LocalDateTime.now())));
+                    var dumpFile
+                    = new File(
+                            dumpFolder,
+                            "dump-%date%.json"
+                                    .replace(
+                                            "%date%",
+                                            DateTimeFormatter.ofPattern(
+                                                    "dd-MM-yyyy_HH-mm-ss")
+                                                    .format(LocalDateTime.now())));
 
                     if (dumpFile.exists()) {
                         dumpFile.delete();
@@ -143,10 +149,10 @@ public class LibreLoginCommand<P> extends StaffCommand<P> {
                         for (StackTraceElement element : info.getStackTrace()) {
                             stackTrace.add(
                                     element.getClassName()
-                                            + "#"
-                                            + element.getMethodName()
-                                            + "#"
-                                            + element.getLineNumber());
+                                    + "#"
+                                    + element.getMethodName()
+                                    + "#"
+                                    + element.getLineNumber());
                         }
 
                         thread.add("stackTrace", stackTrace);
@@ -245,8 +251,8 @@ public class LibreLoginCommand<P> extends StaffCommand<P> {
                                     user.getUuid().toString(),
                                     "%premium_uuid%",
                                     user.getPremiumUUID() == null
-                                            ? "N/A"
-                                            : user.getPremiumUUID().toString(),
+                                    ? "N/A"
+                                    : user.getPremiumUUID().toString(),
                                     "%last_seen%",
                                     DATE_TIME_FORMATTER.format(
                                             user.getLastSeen().toLocalDateTime()),
@@ -261,10 +267,10 @@ public class LibreLoginCommand<P> extends StaffCommand<P> {
                                     user.getIp() == null ? "N/A" : user.getIp(),
                                     "%last_authenticated%",
                                     user.getLastAuthentication() == null
-                                            ? "N/A"
-                                            : DATE_TIME_FORMATTER.format(
-                                                    user.getLastAuthentication()
-                                                            .toLocalDateTime())));
+                                    ? "N/A"
+                                    : DATE_TIME_FORMATTER.format(
+                                            user.getLastAuthentication()
+                                                    .toLocalDateTime())));
                 });
     }
 
@@ -304,9 +310,10 @@ public class LibreLoginCommand<P> extends StaffCommand<P> {
                     var user = getUserOtherWiseInform(name);
                     var colliding = getDatabaseProvider().getByName(newName);
 
-                    if (colliding != null && !colliding.getUuid().equals(user.getUuid()))
+                    if (colliding != null && !colliding.getUuid().equals(user.getUuid())) {
                         throw new InvalidCommandArgument(
                                 getMessage("error-occupied-user", "%name%", newName));
+                    }
 
                     requireOffline(user);
 
@@ -388,17 +395,18 @@ public class LibreLoginCommand<P> extends StaffCommand<P> {
 
                     audience.sendMessage(getMessage("info-edited"));
 
-                    if (player != null)
+                    if (player != null) {
                         plugin.getPlatformHandle()
                                 .kick(player, getMessage("kick-premium-info-enabled"));
+                    }
                 });
     }
 
-    @Subcommand("user cracked")
-    @CommandPermission("librepremium.user.cracked")
-    @Syntax("{@@syntax.user-cracked}")
-    @CommandCompletion("%autocomplete.user-cracked")
-    public CompletionStage<Void> onUserCracked(Audience audience, String name) {
+    @Subcommand("user offline")
+    @CommandPermission("librepremium.user.offline")
+    @Syntax("{@@syntax.user-offline}")
+    @CommandCompletion("%autocomplete.user-offline")
+    public CompletionStage<Void> onUserOffline(Audience audience, String name) {
         return runAsync(
                 () -> {
                     var user = getUserOtherWiseInform(name);
@@ -412,9 +420,10 @@ public class LibreLoginCommand<P> extends StaffCommand<P> {
 
                     audience.sendMessage(getMessage("info-edited"));
 
-                    if (player != null)
+                    if (player != null) {
                         plugin.getPlatformHandle()
                                 .kick(player, getMessage("kick-premium-info-disabled"));
+                    }
                 });
     }
 
@@ -439,20 +448,20 @@ public class LibreLoginCommand<P> extends StaffCommand<P> {
                         throw new InvalidCommandArgument(getMessage("error-password-too-long"));
                     }
                     var premiumUser = plugin.getUserOrThrowICA(name);
-                    user =
-                            new AuthenticUser(
-                                    plugin.generateNewUUID(
-                                            name, premiumUser == null ? null : premiumUser.uuid()),
-                                    null,
-                                    hashedPassword,
-                                    name,
-                                    Timestamp.valueOf(LocalDateTime.now()),
-                                    Timestamp.valueOf(LocalDateTime.now()),
-                                    null,
-                                    null,
-                                    Timestamp.valueOf(LocalDateTime.now()),
-                                    null,
-                                    null);
+                    user
+                    = new AuthenticUser(
+                            plugin.generateNewUUID(
+                                    name, premiumUser == null ? null : premiumUser.uuid()),
+                            null,
+                            hashedPassword,
+                            name,
+                            Timestamp.valueOf(LocalDateTime.now()),
+                            Timestamp.valueOf(LocalDateTime.now()),
+                            null,
+                            null,
+                            Timestamp.valueOf(LocalDateTime.now()),
+                            null,
+                            null);
 
                     getDatabaseProvider().insertUser(user);
 
