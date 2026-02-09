@@ -59,19 +59,19 @@ Migrate from 13+ authentication plugins:
 
 ## Installation
 
-1. Download the latest release from the [Releases](https://github.com/Navio1430/LibreLoginProd/releases) page
+1. Download the latest release from the [Releases](https://github.com/AnarchadiaMC/LibreLoginProd/releases) page
 2. Place the JAR in your `plugins` folder
 3. Restart your server
 4. Configure `plugins/LibreLogin/config.conf`
 
 ## Configuration
 
-See the [Wiki](https://github.com/Navio1430/LibreLoginProd/wiki) for detailed configuration guides:
+See the [Wiki](https://github.com/AnarchadiaMC/LibreLoginProd/wiki) for detailed configuration guides:
 
-- [Configuring Servers](https://github.com/Navio1430/LibreLoginProd/wiki/Configuring-Servers)
-- [Database Migration](https://github.com/Navio1430/LibreLoginProd/wiki/Database-Migration)
-- [UUID Creators](https://github.com/Navio1430/LibreLoginProd/wiki/UUID-Creators)
-- [2FA Setup](https://github.com/Navio1430/LibreLoginProd/wiki/2FA)
+- [Configuring Servers](https://github.com/AnarchadiaMC/LibreLoginProd/wiki/Configuring-Servers)
+- [Database Migration](https://github.com/AnarchadiaMC/LibreLoginProd/wiki/Database-Migration)
+- [UUID Creators](https://github.com/AnarchadiaMC/LibreLoginProd/wiki/UUID-Creators)
+- [2FA Setup](https://github.com/AnarchadiaMC/LibreLoginProd/wiki/2FA)
 
 ## Commands
 
@@ -103,9 +103,6 @@ The compiled JAR will be in `Plugin/build/libs/`.
 This project is licensed under the [Mozilla Public License 2.0](LICENSE).
 
 ## Credits
-
-This is a maintained fork with additional features and improvements including:
-- Enhanced Geyser/Floodgate compatibility
-- Skin restoration for premium players
-- Improved session management
-- Bug fixes and performance improvements
+- [AnarchadiaMC/LibreLoginProd](https://github.com/AnarchadiaMC/LibreLoginProd) - Current maintainer
+- [Navio1430/LibreLoginProd](https://github.com/Navio1430/LibreLoginProd) - Fork creator 
+- [kyngs/LibreLogin](https://github.com/kyngs/LibreLogin) - Original project creator
