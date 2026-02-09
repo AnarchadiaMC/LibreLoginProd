@@ -1,80 +1,111 @@
+# LibreLoginProd
 
+A powerful, multiplatform Minecraft authentication plugin for both **Paper** and **Velocity** servers with full **Geyser/Floodgate** support for Bedrock Edition players.
 
-# Maintenance update 🚀 ❗❗❗minecraft 1.21+
+## Features
 
-update: Thanks to vuxeim and his contribution we can still use LibreLoginProd with the newest minecraft versions.
+### 🔐 Authentication
+- **Secure Password Hashing** - Multiple crypto providers: BCrypt-2A (recommended), Argon-2ID, SHA-256, SHA-512
+- **Session Management** - Configurable session timeout for persistent login
+- **Login Attempt Limiting** - Automatic kick after configurable failed attempts
+- **Two-Factor Authentication (2FA)** - TOTP-based 2FA with in-game QR code scanning (requires Protocolize)
+- **Email Password Recovery** - SMTP-based password reset via email verification
 
-After couple of weeks I've decided to make a move towards new login plugin which is currently under development.
-I'm not going to maintain this plugin anymore, but still I'm open to PR's.
-Here's the new plugin repo: https://github.com/Navio1430/NavAuth. I'm open to literally any support (even by leaving a star) with code, docs, ideas etc. also anything from todo's list.
+### 🎮 Platform Support
+- **Paper** - Full standalone Paper server support with limbo world system
+- **Velocity** - Proxy-based authentication with backend server routing
+- **Geyser/Floodgate Integration** - Seamless Bedrock Edition support with automatic player detection
 
-<br><br>
-<br><br>
-<div display="flex" justify-content="space-between" align="center">
- <h1>LibreLoginProd 🔐 - autologin plugin</h1>
-  <p>Fork of the <b>LibreLogin</b> (previously LibrePremium) which has caused many problems with newest minecraft versions.
-LibreLogin did not meet our expectations, which is why this fork was created.</p>
-</div>
-<br>
-<br>
+### ✨ Premium Features
+- **Premium Account Linking** - Link cracked accounts to Mojang profiles for auto-login
+- **Auto-Registration** - Optional automatic registration for premium usernames
+- **Skin Restoration** - Automatically restores premium player skins after authentication
+- **UUID Management** - Multiple UUID creators: RANDOM, CRACKED, or MOJANG-based
 
-# Contributors, thanks to:
+### � Database Support
+- **MySQL** - Full MySQL database support
+- **PostgreSQL** - Full PostgreSQL database support
+- **SQLite** - Lightweight SQLite for smaller servers
 
-- **vuxeim** - for support for the newest minecraft versions
-- **original LibreLogin creators** - for creating the LibreLogin
+### 🔄 Migration Support
+Migrate from 13+ authentication plugins:
+- AuthMe (MySQL/SQLite/PostgreSQL)
+- JPremium (MySQL)
+- NLogin (MySQL/SQLite)
+- FastLogin (MySQL/SQLite)
+- LimboAuth (MySQL)
+- Aegis (MySQL)
+- LoginSecurity (MySQL/SQLite)
+- DynamicBungeeAuth (MySQL)
+- Authy (MySQL/SQLite)
+- LogIt (MySQL)
+- CrazyLogin (MySQL)
+- UniqueCodeAuth (MySQL)
+- And more...
 
-# Quick information 📌
+### ⚙️ Configuration
+- **Forced Hosts** - Route players from different domains to different lobbies
+- **Limbo Servers/Worlds** - Configurable authentication waiting areas
+- **Remember Last Server** - Optional last-server persistence
+- **IP Registration Limits** - Configurable accounts per IP address
+- **Password Requirements** - Minimum length enforcement
 
-<img src="https://img.shields.io/badge/Java%20version-%2017+-blue?style=for-the-badge&logo=java&logoColor=white"
-alt="Plugin requires Java 17 or newer"></img>
-<a href="https://discord.gg/WTtEQneRJb">
-<img src="https://img.shields.io/badge/Discord-%20SUPPORT-purple?style=for-the-badge&logo=discord&logoColor=white" 
-alt="Support available on Discord"></img>
-</a>
-<a href="https://github.com/Navio1430/LibreLoginProd/graphs/contributors">
-<img src="https://img.shields.io/badge/Contributors-Credits-blue?style=for-the-badge" 
-alt="Contributors listed"></img>
-</a>
+## Requirements
 
-<a href="https://github.com/Navio1430/LibreLoginProd/wiki">
-<img src="https://img.shields.io/badge/Documentation-Docs-orange?style=for-the-badge&logo=wikipedia" alt="Documentation on the Wiki"></img>
-</a>
+- **Java 21** or higher
+- **Paper 1.21+** or **Velocity 3.3+**
+- Optional: **Floodgate** for Bedrock Edition support
+- Optional: **Protocolize** for 2FA QR code display
 
-## Basic set of features 🎯
+## Installation
 
-- AutoLogin for premium players
-- TOTP 2FA (Authy, Google Authenticator...) [details](https://github.com/Navio1430/LibreLoginProd/wiki/2FA)
-- Session system
-- Name validation (including case sensitivity check)
-- Automatic data migration for premium players
-- Migration of a player's data by using one command
-- Geyser (Bedrock) support using [Floodgate](https://github.com/Navio1430/LibreLoginProd/wiki/Floodgate)
+1. Download the latest release from the [Releases](https://github.com/Navio1430/LibreLoginProd/releases) page
+2. Place the JAR in your `plugins` folder
+3. Restart your server
+4. Configure `plugins/LibreLogin/config.conf`
 
-## Platforms ⚙️
-- [✔️] Velocity - up to 1.21.11
-- [✔️] Paper - up to 1.21.11
-- [❌] BungeeCord - no longer supported, do not use it for production
+## Configuration
 
-## Main changes 
+See the [Wiki](https://github.com/Navio1430/LibreLoginProd/wiki) for detailed configuration guides:
 
-- [📚] Support for the newest Minecraft Paper and Velocity versions
+- [Configuring Servers](https://github.com/Navio1430/LibreLoginProd/wiki/Configuring-Servers)
+- [Database Migration](https://github.com/Navio1430/LibreLoginProd/wiki/Database-Migration)
+- [UUID Creators](https://github.com/Navio1430/LibreLoginProd/wiki/UUID-Creators)
+- [2FA Setup](https://github.com/Navio1430/LibreLoginProd/wiki/2FA)
 
-- [❌] No more support for BungeeCord (maybe will be brought back in future)
-- [❌] Removed compatibility with NanoLimboPlugin (should not be used on prod)
+## Commands
 
-# FAQ
+### Player Commands
+| Command | Description |
+|---------|-------------|
+| `/register <password> <password>` | Register a new account |
+| `/login <password>` | Login to your account |
+| `/changepassword <old> <new>` | Change your password |
+| `/premium` | Premium account linking commands |
+| `/2fa` | Two-factor authentication setup |
+| `/email` | Email verification commands |
 
-### What does prod mean?
-This means that the project is a heavily modified version intended for production use.
+### Staff Commands
+| Command | Permission |
+|---------|------------|
+| `/librelogin` | `librelogin.admin` |
 
-### Why is the plugin almost 5MB?
-We are currently trying to go down to 500KB, but first we need
-to divide whole project into submodules.
+## Building
 
-### Will the folder name change after installation?
-No, we use the same folder and config names as original the **LibreLogin**.
+```bash
+./gradlew clean shadowJar -x spotlessCheck -x test
+```
 
-# License
+The compiled JAR will be in `Plugin/build/libs/`.
 
-Project is licensed under the Mozilla Public License 2.0.
-[Read the license here.](https://github.com/Navio1430/LibreLoginProd/blob/master/LICENSE)
+## License
+
+This project is licensed under the [Mozilla Public License 2.0](LICENSE).
+
+## Credits
+
+This is a maintained fork with additional features and improvements including:
+- Enhanced Geyser/Floodgate compatibility
+- Skin restoration for premium players
+- Improved session management
+- Bug fixes and performance improvements
