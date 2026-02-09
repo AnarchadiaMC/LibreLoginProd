@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
 package xyz.kyngs.librelogin.paper;
 
 import static xyz.kyngs.librelogin.paper.protocol.ProtocolUtil.getServerVersion;
@@ -232,7 +231,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
             return;
         }
 
-        var world = chooseServer(puuid, ip, readOnlyUserCache.getIfPresent(puuid));
+        var user = readOnlyUserCache.getIfPresent(puuid);
+        var world = chooseServer(puuid, ip, user);
         ipCache.invalidate(puuid);
         spawnLocationCache.invalidate(puuid);
         if (world.value() == null) {
@@ -256,7 +256,11 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                 var primaryWorld = Bukkit.getWorlds().get(0);
                 Path worldFolder = primaryWorld.getWorldFolder().toPath();
 
-                var playerPosition = PlayerDataReader.readPlayerPosition(worldFolder, puuid);
+                // Use the database UUID, not the connection UUID, for player data lookup
+                // This is critical for cracked players whose connection UUID differs from
+                // the UUID stored in the database and used for their player.dat file
+                UUID playerDataUuid = (user != null) ? user.getUuid() : puuid;
+                var playerPosition = PlayerDataReader.readPlayerPosition(worldFolder, playerDataUuid);
                 if (playerPosition != null) {
                     String targetWorldName = playerPosition.getWorldName();
                     World targetWorld = Bukkit.getWorld(targetWorldName);
