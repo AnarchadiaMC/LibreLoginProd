@@ -21,8 +21,8 @@ public class VoidWorldGenerator extends ChunkGenerator {
             int chunkX,
             int chunkZ,
             @NotNull ChunkData chunkData) {
-        if (chunkX == 0 && chunkZ == 0) {
-            chunkData.setBlock(0, 69, 0, Material.BARRIER);
+        if (chunkX == 62 && chunkZ == 62) {
+            chunkData.setBlock(8, 69, 8, Material.BARRIER);
         }
         super.generateSurface(worldInfo, random, chunkX, chunkZ, chunkData);
     }

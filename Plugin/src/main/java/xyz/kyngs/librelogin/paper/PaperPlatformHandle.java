@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
 package xyz.kyngs.librelogin.paper;
 
 import static xyz.kyngs.librelogin.paper.protocol.ProtocolUtil.getServerVersion;
@@ -83,7 +82,7 @@ public class PaperPlatformHandle implements PlatformHandle<Player, World> {
 
         if (limbo) {
             world.setSpawnLocation(
-                    new Location(world, 0.5, world.getHighestBlockYAt(0, 0) + 1, 0.5));
+                    new Location(world, 1000.5, world.getHighestBlockYAt(1000, 1000) + 1, 1000.5));
             if (getServerVersion().isOlderThan(ServerVersion.V_1_21_9)) {
                 world.setKeepSpawnInMemory(true);
             }
