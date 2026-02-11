@@ -3,12 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
 package xyz.kyngs.librelogin.paper;
 
-import static xyz.kyngs.librelogin.common.config.ConfigurationKeys.ALLOWED_COMMANDS_WHILE_UNAUTHORIZED;
-
-import io.papermc.paper.event.player.AsyncChatEvent;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
@@ -22,9 +18,18 @@ import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.EntityTargetEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.player.*;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
+
+import io.papermc.paper.event.player.AsyncChatEvent;
 import xyz.kyngs.librelogin.api.authorization.AuthorizationProvider;
 import xyz.kyngs.librelogin.api.server.ServerHandler;
+import static xyz.kyngs.librelogin.common.config.ConfigurationKeys.ALLOWED_COMMANDS_WHILE_UNAUTHORIZED;
 import xyz.kyngs.librelogin.common.config.HoconPluginConfiguration;
 
 public class Blockers implements Listener {
@@ -74,12 +79,16 @@ public class Blockers implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onCommand(PlayerCommandPreprocessEvent event) {
         if (authorizationProvider.isAuthorized(event.getPlayer())
-                && !authorizationProvider.isAwaiting2FA(event.getPlayer())) return;
+                && !authorizationProvider.isAwaiting2FA(event.getPlayer())) {
+            return;
+        }
 
         var command = event.getMessage().substring(1).split(" ")[0];
 
         for (String allowed : configuration.get(ALLOWED_COMMANDS_WHILE_UNAUTHORIZED)) {
-            if (command.equals(allowed)) return;
+            if (command.equals(allowed)) {
+                return;
+            }
         }
 
         event.setCancelled(true);
@@ -87,7 +96,9 @@ public class Blockers implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onMove(PlayerMoveEvent event) {
-        if (!event.hasChangedPosition()) return;
+        if (!event.hasChangedPosition()) {
+            return;
+        }
         cancelIfNeeded(event);
     }
 

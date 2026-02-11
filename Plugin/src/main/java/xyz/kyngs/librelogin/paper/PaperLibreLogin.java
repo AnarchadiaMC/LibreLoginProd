@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
 package xyz.kyngs.librelogin.paper;
 
 import static xyz.kyngs.librelogin.common.config.ConfigurationKeys.DEBUG;
@@ -39,7 +38,12 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
 
     private final PaperBootstrap bootstrap;
     private PaperListeners listeners;
+    private PacketListener packetListener;
     private boolean started;
+
+    public PacketListener getPacketListener() {
+        return packetListener;
+    }
 
     public PaperLibreLogin(PaperBootstrap bootstrap) {
         this.bootstrap = bootstrap;
@@ -142,8 +146,8 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
 
         boolean isBehindProxy;
         if (getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_21_4)) {
-            isBehindProxy = Bukkit.getServer().getServerConfig().isProxyEnabled(); 
-        }else {
+            isBehindProxy = Bukkit.getServer().getServerConfig().isProxyEnabled();
+        } else {
             isBehindProxy
                     = Bukkit.spigot().getSpigotConfig().getBoolean("settings.bungeecord")
                     || Bukkit.spigot()
@@ -177,6 +181,10 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
                         return;
                     }
                     player.setInvisible(false);
+                    // Mark player as authorized so inventory packets are no longer blocked
+                    packetListener.markAuthorized(player.getUniqueId());
+                    // Resync inventory to client - packets were blocked before auth
+                    player.updateInventory();
                 });
 
         listeners = new PaperListeners(this);
@@ -198,7 +206,8 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
                             + " PlayerSpawnLocationEvent fallback");
         }
 
-        PacketEvents.getAPI().getEventManager().registerListener(new PacketListener(listeners));
+        packetListener = new PacketListener(listeners);
+        PacketEvents.getAPI().getEventManager().registerListener(packetListener);
 
         started = true;
     }

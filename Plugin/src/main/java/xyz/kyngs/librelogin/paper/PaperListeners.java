@@ -130,6 +130,11 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         if (player.getHealth() == 0) {
             player.setHealth(player.getMaxHealth());
         }
+        // Clean up packet filter state
+        var packetListener = plugin.getPacketListener();
+        if (packetListener != null) {
+            packetListener.markUnauthorized(player.getUniqueId());
+        }
         GeneralUtil.runAsync(() -> onPlayerDisconnect(event.getPlayer()));
     }
 
