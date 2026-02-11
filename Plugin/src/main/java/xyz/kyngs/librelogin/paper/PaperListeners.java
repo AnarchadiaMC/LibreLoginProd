@@ -490,7 +490,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                                         username,
                                         token,
                                         clientKey.orElse(null),
-                                        preLoginResult.user().getUuid()));
+                                        preLoginResult.user().getUuid(),
+                                        false));
 
                         PacketEvents.getAPI()
                                 .getProtocolManager()
@@ -506,14 +507,37 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                     }
                 }
                 default -> {
-                    // The original event has been cancelled, so we need to send a fake start
-                    // packet. It should be safe to set a random UUID as it will be replaced by the
-                    // real one later
-                    receiveFakeStartPacket(
-                            username,
-                            clientKey.orElse(null),
-                            event.getChannel(),
-                            UUID.randomUUID());
+                    // Encrypt the connection even for offline/cracked players
+                    // to protect against MITM attacks
+                    byte[] offlineToken;
+                    try {
+                        offlineToken = EncryptionUtil.generateVerifyToken(random);
+
+                        var offlineEncPacket
+                                = new WrapperLoginServerEncryptionRequest(
+                                        "", keyPair.getPublic(), offlineToken);
+
+                        encryptionDataCache.put(
+                                sessionKey,
+                                new EncryptionData(
+                                        username,
+                                        offlineToken,
+                                        clientKey.orElse(null),
+                                        UUID.randomUUID(),
+                                        true));
+
+                        PacketEvents.getAPI()
+                                .getProtocolManager()
+                                .sendPacket(event.getChannel(), offlineEncPacket);
+                    } catch (Exception e) {
+                        plugin.getLogger()
+                                .error(
+                                        "Failed to send encryption packet for offline player "
+                                        + username
+                                        + "! Kicking player.");
+                        e.printStackTrace();
+                        kickPlayer("Internal error", user);
+                    }
                 }
             }
         } else {
@@ -554,26 +578,46 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                 return;
             }
 
-            var serverId = EncryptionUtil.getServerIdHashString("", loginKey, keyPair.getPublic());
             var username = data.username();
-            var address = user.getAddress();
 
-            try {
-                // Use the new method that also captures skin data
-                var skinResult
-                        = hasJoinedWithSkin(username, serverId, address.getAddress(), data.uuid());
-                if (skinResult != null) {
-                    receiveFakeStartPacket(
-                            username, data.publicKey(), event.getChannel(), data.uuid());
-                } else {
-                    kickPlayer("Invalid session", user);
+            if (data.offlinePlayer()) {
+                // Offline player - encryption is enabled, skip Mojang session verification
+                plugin.getLogger()
+                        .debug("Encryption enabled for offline player " + username);
+                receiveFakeStartPacket(
+                        username, data.publicKey(), event.getChannel(), data.uuid());
+            } else {
+                // Premium player - verify session with Mojang
+                var serverId
+                        = EncryptionUtil.getServerIdHashString(
+                                "", loginKey, keyPair.getPublic());
+                var address = user.getAddress();
+
+                try {
+                    var skinResult
+                            = hasJoinedWithSkin(
+                                    username,
+                                    serverId,
+                                    address.getAddress(),
+                                    data.uuid());
+                    if (skinResult != null) {
+                        receiveFakeStartPacket(
+                                username,
+                                data.publicKey(),
+                                event.getChannel(),
+                                data.uuid());
+                    } else {
+                        kickPlayer("Invalid session", user);
+                    }
+                } catch (IOException e) {
+                    if (e instanceof SocketTimeoutException) {
+                        plugin.getLogger()
+                                .warn(
+                                        "Session verification timed out (5 seconds) for "
+                                        + username);
+                    }
+                    kickPlayer("Cannot verify session", user);
                 }
-            } catch (IOException e) {
-                if (e instanceof SocketTimeoutException) {
-                    plugin.getLogger()
-                            .warn("Session verification timed out (5 seconds) for " + username);
-                }
-                kickPlayer("Cannot verify session", user);
             }
         }
     }
