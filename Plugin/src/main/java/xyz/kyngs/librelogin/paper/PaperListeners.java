@@ -516,6 +516,9 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                         var offlineEncPacket
                                 = new WrapperLoginServerEncryptionRequest(
                                         "", keyPair.getPublic(), offlineToken);
+                        // Critical: tell the client NOT to verify with Mojang
+                        // Without this, cracked clients try session auth, fail, and disconnect
+                        offlineEncPacket.setShouldAuthenticate(false);
 
                         encryptionDataCache.put(
                                 sessionKey,
@@ -555,6 +558,7 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
             if (!verifyNonce(packet, data.publicKey(), expectedToken)) {
                 kickPlayer("Invalid nonce", user);
+                return;
             }
 
             // Verify session
