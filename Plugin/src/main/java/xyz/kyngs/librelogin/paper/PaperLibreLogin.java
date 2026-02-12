@@ -42,10 +42,6 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
     private PacketListener packetListener;
     private boolean started;
 
-    public PacketListener getPacketListener() {
-        return packetListener;
-    }
-
     public PaperLibreLogin(PaperBootstrap bootstrap) {
         this.bootstrap = bootstrap;
         this.started = false;
@@ -182,9 +178,7 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
                         return;
                     }
                     player.setInvisible(false);
-                    // Mark player as authorized so inventory packets are no longer blocked
-                    packetListener.markAuthorized(player.getUniqueId());
-                    // Resync inventory to client - packets were blocked before auth
+                    // Resync inventory to client - packets may have been blocked in limbo
                     player.updateInventory();
                 });
 
@@ -207,7 +201,7 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
                             + " PlayerSpawnLocationEvent fallback");
         }
 
-        packetListener = new PacketListener(listeners);
+        packetListener = new PacketListener(listeners, this);
         PacketEvents.getAPI().getEventManager().registerListener(packetListener);
 
         started = true;

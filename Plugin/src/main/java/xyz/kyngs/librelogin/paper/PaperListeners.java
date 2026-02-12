@@ -130,11 +130,6 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         if (player.getHealth() == 0) {
             player.setHealth(player.getMaxHealth());
         }
-        // Clean up packet filter state
-        var packetListener = plugin.getPacketListener();
-        if (packetListener != null) {
-            packetListener.markUnauthorized(player.getUniqueId());
-        }
         GeneralUtil.runAsync(() -> onPlayerDisconnect(event.getPlayer()));
     }
 
@@ -151,18 +146,6 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
             return;
         }
         readOnlyUserCache.invalidate(event.getPlayer().getUniqueId());
-
-        // Floodgate/Geyser players are auto-authenticated by Floodgate and skip
-        // LibreLogin's auth flow entirely (onPostLogin returns early for them).
-        // Mark them as authorized in the packet filter so inventory packets
-        // (WINDOW_ITEMS, SET_SLOT, OPEN_WINDOW, ENTITY_EQUIPMENT) are not blocked.
-        if (plugin.fromFloodgate(event.getPlayer().getName())) {
-            var packetListener = plugin.getPacketListener();
-            if (packetListener != null) {
-                packetListener.markAuthorized(event.getPlayer().getUniqueId());
-            }
-        }
-
         onPostLogin(event.getPlayer(), data);
     }
 
