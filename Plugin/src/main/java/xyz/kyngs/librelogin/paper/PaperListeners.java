@@ -147,6 +147,9 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         }
         readOnlyUserCache.invalidate(event.getPlayer().getUniqueId());
         onPostLogin(event.getPlayer(), data);
+        plugin.stashMountForLimbo(event.getPlayer());
+        Bukkit.getScheduler()
+                .runTask(plugin.getBootstrap(), () -> plugin.stashMountForLimbo(event.getPlayer()));
     }
 
     @EventHandler(priority = EventPriority.LOWEST)

@@ -18,14 +18,22 @@ import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
 import java.io.File;
 import java.io.InputStream;
+import java.util.Comparator;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import net.kyori.adventure.audience.Audience;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.CustomChart;
 import org.bstats.charts.SimplePie;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.entity.AbstractHorse;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntitySnapshot;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Pig;
+import org.bukkit.util.Vector;
 import xyz.kyngs.librelogin.api.Logger;
 import xyz.kyngs.librelogin.api.database.User;
 import xyz.kyngs.librelogin.api.event.exception.EventCancelledException;
@@ -40,7 +48,10 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
     private final PaperBootstrap bootstrap;
     private PaperListeners listeners;
     private PacketListener packetListener;
+    private final Map<UUID, StashedMount> stashedMounts = new ConcurrentHashMap<>();
     private boolean started;
+
+    private record StashedMount(EntitySnapshot snapshot, String typeName) {}
 
     public PaperLibreLogin(PaperBootstrap bootstrap) {
         this.bootstrap = bootstrap;
@@ -59,6 +70,109 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
 
     public PaperBootstrap getBootstrap() {
         return bootstrap;
+    }
+
+    private boolean isStashableMount(Entity entity) {
+        return entity instanceof AbstractHorse || entity instanceof Pig;
+    }
+
+    private Entity findMountToStash(Player player) {
+        var directVehicle = player.getVehicle();
+        if (isStashableMount(directVehicle)) {
+            return directVehicle;
+        }
+
+        if (stashedMounts.containsKey(player.getUniqueId())) {
+            return null;
+        }
+
+        var playerLocation = player.getLocation();
+        return player.getNearbyEntities(2.0, 2.0, 2.0).stream()
+                .filter(this::isStashableMount)
+                .filter(
+                        entity ->
+                                entity.getPassengers().isEmpty()
+                                        || entity.getPassengers().contains(player))
+                .min(
+                        Comparator.comparingDouble(
+                                entity ->
+                                        entity.getLocation().distanceSquared(playerLocation)))
+                .orElse(null);
+    }
+
+    public void stashMountForLimbo(Player player) {
+        if (player == null
+                || !player.isOnline()
+                || !getServerHandler().getLimboServers().contains(player.getWorld())
+                || (getAuthorizationProvider().isAuthorized(player)
+                && !getAuthorizationProvider().isAwaiting2FA(player))) {
+            return;
+        }
+
+        var mount = findMountToStash(player);
+        if (mount == null || !mount.isValid()) {
+            return;
+        }
+
+        boolean hadPlayerPassenger = mount.getPassengers().contains(player);
+        if (hadPlayerPassenger) {
+            player.leaveVehicle();
+            mount.removePassenger(player);
+        }
+
+        var snapshot = mount.createSnapshot();
+        if (snapshot == null) {
+            if (hadPlayerPassenger && player.isOnline()) {
+                mount.addPassenger(player);
+            }
+            getLogger()
+                    .warn(
+                            "Failed to snapshot mount "
+                            + mount.getType()
+                            + " for "
+                            + player.getName()
+                            + ", leaving it in place.");
+            return;
+        }
+
+        stashedMounts.put(
+                player.getUniqueId(), new StashedMount(snapshot, mount.getType().toString()));
+        mount.remove();
+    }
+
+    private void restoreStashedMount(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+
+        var stashedMount = stashedMounts.get(player.getUniqueId());
+        if (stashedMount == null) {
+            return;
+        }
+
+        try {
+            var restoredMount = stashedMount.snapshot().createEntity(player.getLocation());
+            restoredMount.setVelocity(new Vector());
+            if (!restoredMount.addPassenger(player)) {
+                Bukkit.getScheduler()
+                        .runTask(
+                                bootstrap,
+                                () -> {
+                                    if (player.isOnline() && restoredMount.isValid()) {
+                                        restoredMount.addPassenger(player);
+                                    }
+                                });
+            }
+            stashedMounts.remove(player.getUniqueId(), stashedMount);
+        } catch (Exception e) {
+            getLogger()
+                    .warn(
+                            "Failed to restore stashed mount "
+                            + stashedMount.typeName()
+                            + " for "
+                            + player.getName(),
+                            e);
+        }
     }
 
     @Override
@@ -248,22 +362,64 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
             }
 
             var finalLocation = location;
-            PaperUtil.runSyncAndWait(() -> player.teleportAsync(finalLocation), this);
-
-            // Execute RTP command for new players without saved location
-            if (isNewPlayer
+            var runNewPlayerRtp
+                    = isNewPlayer
                     && getConfiguration()
-                            .get(xyz.kyngs.librelogin.common.config.ConfigurationKeys.NEW_PLAYER_RTP_ENABLED)) {
-                var command
-                        = getConfiguration()
-                                .get(xyz.kyngs.librelogin.common.config.ConfigurationKeys.NEW_PLAYER_RTP_COMMAND)
-                                .replace("{player}", player.getName());
-                getLogger().info("Executing RTP command for new player " + player.getName());
-                Bukkit.getScheduler()
-                        .runTask(
-                                getBootstrap(),
-                                () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command));
-            }
+                            .get(xyz.kyngs.librelogin.common.config.ConfigurationKeys.NEW_PLAYER_RTP_ENABLED);
+
+            PaperUtil.runSyncAndWait(
+                    () ->
+                            player.teleportAsync(finalLocation)
+                                    .whenComplete(
+                                            (teleported, throwable) ->
+                                                    Bukkit.getScheduler()
+                                                            .runTask(
+                                                                    bootstrap,
+                                                                    () -> {
+                                                                        if (throwable != null) {
+                                                                            getLogger()
+                                                                                    .warn(
+                                                                                            "Failed to teleport authenticated player "
+                                                                                            + player.getName(),
+                                                                                            throwable);
+                                                                            return;
+                                                                        }
+
+                                                                        if (!Boolean.TRUE.equals(
+                                                                                teleported)) {
+                                                                            getLogger()
+                                                                                    .warn(
+                                                                                            "Teleport for authenticated player "
+                                                                                            + player.getName()
+                                                                                            + " returned false.");
+                                                                            return;
+                                                                        }
+
+                                                                        if (!player.isOnline()) {
+                                                                            return;
+                                                                        }
+
+                                                                        restoreStashedMount(player);
+
+                                                                        if (!runNewPlayerRtp) {
+                                                                            return;
+                                                                        }
+
+                                                                        var command
+                                                                                = getConfiguration()
+                                                                                        .get(xyz.kyngs.librelogin.common.config.ConfigurationKeys.NEW_PLAYER_RTP_COMMAND)
+                                                                                        .replace(
+                                                                                                "{player}",
+                                                                                                player.getName());
+                                                                        getLogger()
+                                                                                .info(
+                                                                                        "Executing RTP command for new player "
+                                                                                        + player.getName());
+                                                                        Bukkit.dispatchCommand(
+                                                                                Bukkit.getConsoleSender(),
+                                                                                command);
+                                                                    })),
+                    this);
 
         } catch (EventCancelledException ignored) {
         }

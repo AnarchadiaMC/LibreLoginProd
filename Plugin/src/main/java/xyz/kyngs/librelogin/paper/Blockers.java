@@ -13,12 +13,19 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.EntityTargetEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.hanging.HangingBreakByEntityEvent;
+import org.bukkit.event.hanging.HangingPlaceEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
+import org.bukkit.event.player.PlayerBucketEmptyEvent;
+import org.bukkit.event.player.PlayerBucketFillEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerEvent;
@@ -58,6 +65,16 @@ public class Blockers implements Listener {
     private boolean inLimbo(Player player) {
         return !authorizationProvider.isAuthorized(player)
                 || authorizationProvider.isAwaiting2FA(player);
+    }
+
+    private boolean inProtectedLimboWorld(World world) {
+        return serverHandler.getLimboServers().contains(world);
+    }
+
+    private void cancelWorldInteraction(Player player, Cancellable cancellable) {
+        if (inLimbo(player) || inProtectedLimboWorld(player.getWorld())) {
+            cancellable.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -103,14 +120,33 @@ public class Blockers implements Listener {
         cancelIfNeeded(event);
     }
 
-    @EventHandler(priority = EventPriority.LOWEST)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onBlockBreak(BlockBreakEvent event) {
-        cancelIfNeeded(event.getPlayer(), event);
+        cancelWorldInteraction(event.getPlayer(), event);
     }
 
-    @EventHandler(priority = EventPriority.LOWEST)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onBlockPlace(BlockPlaceEvent event) {
-        cancelIfNeeded(event.getPlayer(), event);
+        cancelWorldInteraction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onBucketEmpty(PlayerBucketEmptyEvent event) {
+        cancelWorldInteraction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onBucketFill(PlayerBucketFillEvent event) {
+        cancelWorldInteraction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onBlockIgnite(BlockIgniteEvent event) {
+        var player = event.getPlayer();
+        if (inProtectedLimboWorld(event.getBlock().getWorld())
+                || (player != null && inLimbo(player))) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -163,5 +199,29 @@ public class Blockers implements Listener {
         if (event.getWhoClicked() instanceof Player player) {
             cancelIfNeeded(player, event);
         }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onDrag(InventoryDragEvent event) {
+        if (event.getWhoClicked() instanceof Player player) {
+            cancelIfNeeded(player, event);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onHangingPlace(HangingPlaceEvent event) {
+        cancelWorldInteraction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onHangingBreak(HangingBreakByEntityEvent event) {
+        if (event.getRemover() instanceof Player player) {
+            cancelWorldInteraction(player, event);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onArmorStandManipulate(PlayerArmorStandManipulateEvent event) {
+        cancelWorldInteraction(event.getPlayer(), event);
     }
 }
