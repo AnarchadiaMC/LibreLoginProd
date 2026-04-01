@@ -6,66 +6,63 @@
 
 package xyz.kyngs.librelogin.paper;
 
-import org.geysermc.floodgate.api.player.FloodgatePlayer;
-
 import com.github.retrooper.packetevents.event.PacketReceiveEvent;
 import com.github.retrooper.packetevents.wrapper.login.client.WrapperLoginClientLoginStart;
-
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.util.AttributeKey;
+import org.geysermc.floodgate.api.player.FloodgatePlayer;
 
+/**
+ * Bridges the parts of Floodgate's login pipeline that are not triggered when LibreLogin handles
+ * the incoming login packet first.
+ */
 public class FloodgateHelper {
+    private static final AttributeKey<String> FLOODGATE_KICK_MESSAGE =
+            AttributeKey.valueOf("floodgate-kick-message");
+    private static final AttributeKey<FloodgatePlayer> FLOODGATE_PLAYER_ATTRIBUTE =
+            AttributeKey.valueOf("floodgate-player");
+    private static final String FLOODGATE_HANDLER_NAME = "floodgate_data_handler";
 
     /**
-     * Reimplementation of the tasks injected Floodgate in ProtocolLib that are
-     * not run due to a bug
+     * Applies the Floodgate login adjustments that would normally be handled by its packet hook.
      *
-     * @param event the PacketEvent that won't be processed by Floodgate
-     * @return false if the player was kicked
-     * @author games647 and FastLogin contributors
-     * @see <a href="https://github.com/GeyserMC/Floodgate/issues/143">Issue
-     * Floodgate#143</a>
-     * @see <a
-     *     href="https://github.com/GeyserMC/Floodgate/blob/5d5713ed9e9eeab0f4abdaa9cf5cd8619dc1909b/spigot/src/main/java/org/geysermc/floodgate/addon/data/SpigotDataHandler.java#L121-L175">Floodgate/SpigotDataHandler</a>
+     * @param packetEvent intercepted login packet event
+     * @param loginStart mutable login-start packet wrapper
+     * @return {@code true} when login handling may continue, otherwise {@code false}
      */
-    protected boolean processFloodgateTasks(
-            PacketReceiveEvent event, WrapperLoginClientLoginStart packet) {
-        FloodgatePlayer floodgatePlayer = getFloodgatePlayer(event.getChannel());
+    protected boolean applyLoginWorkaround(
+            PacketReceiveEvent packetEvent, WrapperLoginClientLoginStart loginStart) {
+        FloodgatePlayer floodgatePlayer = findFloodgatePlayer(packetEvent.getChannel());
         if (floodgatePlayer == null) {
             return true;
         }
 
-        // kick the player, if necessary
-        Channel channel = (Channel) event.getChannel();
-        AttributeKey<String> kickMessageAttribute = AttributeKey.valueOf("floodgate-kick-message");
-        String kickMessage = channel.attr(kickMessageAttribute).get();
+        Channel loginChannel = (Channel) packetEvent.getChannel();
+        String kickMessage = loginChannel.attr(FLOODGATE_KICK_MESSAGE).get();
         if (kickMessage != null) {
-            event.getUser().closeConnection();
+            packetEvent.getUser().closeConnection();
             return false;
         }
 
-        // add prefix
-        String username = floodgatePlayer.getCorrectUsername();
-        packet.setUsername(username);
+        loginStart.setUsername(floodgatePlayer.getCorrectUsername());
 
-        // remove real Floodgate data handler
-        ChannelHandler floodgateHandler = channel.pipeline().get("floodgate_data_handler");
-        channel.pipeline().remove(floodgateHandler);
+        ChannelHandler pipelineHandler = loginChannel.pipeline().get(FLOODGATE_HANDLER_NAME);
+        if (pipelineHandler != null) {
+            loginChannel.pipeline().remove(pipelineHandler);
+        }
 
         return true;
     }
 
     /**
-     * Gets the FloodgatePlayer associated with a channel, if present. This can
-     * be used to detect Floodgate/Bedrock players before parsing packets.
+     * Retrieves the Floodgate player object already attached to a channel, if present.
      *
-     * @param channel the Netty channel
-     * @return the FloodgatePlayer if present, null otherwise
-     * @author games647 and FastLogin contributors
+     * @param channel Netty login channel
+     * @return associated Floodgate player, or {@code null} when the connection is not managed by
+     *     Floodgate
      */
-    public FloodgatePlayer getFloodgatePlayer(Object channel) {
-        AttributeKey<FloodgatePlayer> floodgateAttribute = AttributeKey.valueOf("floodgate-player");
-        return ((Channel) channel).attr(floodgateAttribute).get();
+    public FloodgatePlayer findFloodgatePlayer(Object channel) {
+        return ((Channel) channel).attr(FLOODGATE_PLAYER_ATTRIBUTE).get();
     }
 }

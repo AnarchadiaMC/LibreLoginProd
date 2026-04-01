@@ -1,5 +1,3 @@
-import org.cadixdev.gradle.licenser.LicenseProperties
-
 plugins {
     id("org.cadixdev.licenser") version "0.6.1"
 //    id("com.diffplug.spotless") version "7.2.1"
@@ -37,10 +35,6 @@ subprojects {
         header(rootProject.file("HEADER.txt"))
         include("**/*.java")
         newLine(true)
-
-        matching("", closureOf<LicenseProperties> {
-            header.set(rootProject.resources.text.fromFile("licenses/FASTLOGIN_LICENSE"))
-        });
     }
 
 //     spotless {
