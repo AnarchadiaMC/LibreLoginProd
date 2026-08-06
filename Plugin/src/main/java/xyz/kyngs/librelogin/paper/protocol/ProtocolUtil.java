@@ -26,10 +26,17 @@ public class ProtocolUtil {
     }
 
     public static Object findNetworkManager(Object channel) {
+        Channel c = (Channel) channel;
+
+        Object pipelineManager = c.pipeline().get("packet_handler");
+        if (pipelineManager != null && NETWORK_MANAGER_CLASS.isInstance(pipelineManager)) {
+            return pipelineManager;
+        }
+
         var managers = SpigotReflectionUtil.getNetworkManagers();
         for (Object manager : managers) {
             var managerChannel = (Channel) getChannel(manager);
-            if (managerChannel.remoteAddress().equals(((Channel) channel).remoteAddress())) {
+            if (managerChannel == c || (managerChannel != null && managerChannel.remoteAddress() != null && managerChannel.remoteAddress().equals(c.remoteAddress()))) {
                 return manager;
             }
         }

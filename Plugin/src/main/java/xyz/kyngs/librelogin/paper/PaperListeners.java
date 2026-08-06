@@ -788,8 +788,7 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
             Object channel)
             throws IllegalArgumentException {
         if (encryptionBootstrapMethod == null) {
-            Class<?> networkManagerClass
-                    = SpigotReflectionUtil.getNetworkManagers().get(0).getClass();
+            Class<?> networkManagerClass = SpigotReflectionUtil.NETWORK_MANAGER_CLASS;
 
             encryptionBootstrapMethod
                     = Reflection.getMethod(networkManagerClass, "setupEncryption", SecretKey.class);
