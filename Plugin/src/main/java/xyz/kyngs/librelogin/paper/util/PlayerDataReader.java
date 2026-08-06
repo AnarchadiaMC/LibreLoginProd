@@ -69,6 +69,13 @@ public class PlayerDataReader {
         double[] pos = null;
         float[] rotation = null;
         String dimension = null;
+        Float health = null;
+        Integer spawnX = null;
+        Integer spawnY = null;
+        Integer spawnZ = null;
+        String spawnDimension = null;
+        Float spawnAngle = null;
+        Boolean spawnForced = null;
 
         while (true) {
             byte tagType = dis.readByte();
@@ -84,16 +91,25 @@ public class PlayerDataReader {
                 rotation = readFloatList(dis);
             } else if (tagName.equals("Dimension") && tagType == TAG_STRING) {
                 dimension = readString(dis);
+            } else if (tagName.equals("Health") && tagType == TAG_FLOAT) {
+                health = dis.readFloat();
+            } else if (tagName.equals("Health") && tagType == TAG_SHORT) {
+                health = (float) dis.readShort();
+            } else if (tagName.equals("SpawnX") && tagType == TAG_INT) {
+                spawnX = dis.readInt();
+            } else if (tagName.equals("SpawnY") && tagType == TAG_INT) {
+                spawnY = dis.readInt();
+            } else if (tagName.equals("SpawnZ") && tagType == TAG_INT) {
+                spawnZ = dis.readInt();
+            } else if (tagName.equals("SpawnDimension") && tagType == TAG_STRING) {
+                spawnDimension = readString(dis);
+            } else if (tagName.equals("SpawnAngle") && tagType == TAG_FLOAT) {
+                spawnAngle = dis.readFloat();
+            } else if (tagName.equals("SpawnForced") && tagType == TAG_BYTE) {
+                spawnForced = dis.readByte() != 0;
             } else {
                 // Skip this tag
                 skipTag(dis, tagType);
-            }
-
-            // Early exit if we found everything
-            if (pos != null && rotation != null && dimension != null) {
-                // Skip remaining tags
-                skipRemainingCompound(dis);
-                break;
             }
         }
 
@@ -101,8 +117,11 @@ public class PlayerDataReader {
             float yaw = (rotation != null && rotation.length >= 1) ? rotation[0] : 0f;
             float pitch = (rotation != null && rotation.length >= 2) ? rotation[1] : 0f;
             String dim = (dimension != null) ? dimension : "minecraft:overworld";
+            float h = (health != null) ? health : 20.0f;
 
-            return new PlayerPosition(pos[0], pos[1], pos[2], yaw, pitch, dim);
+            return new PlayerPosition(
+                    pos[0], pos[1], pos[2], yaw, pitch, dim, h,
+                    spawnX, spawnY, spawnZ, spawnDimension, spawnAngle, spawnForced);
         }
 
         return null;
@@ -226,7 +245,31 @@ public class PlayerDataReader {
 
     /** Record holding player position data extracted from player.dat */
     public record PlayerPosition(
-            double x, double y, double z, float yaw, float pitch, String dimension) {
+            double x,
+            double y,
+            double z,
+            float yaw,
+            float pitch,
+            String dimension,
+            float health,
+            Integer spawnX,
+            Integer spawnY,
+            Integer spawnZ,
+            String spawnDimension,
+            Float spawnAngle,
+            Boolean spawnForced) {
+
+        public boolean isDead() {
+            return health <= 0.0f;
+        }
+
+        public boolean hasRespawnPoint() {
+            return spawnX != null && spawnY != null && spawnZ != null;
+        }
+
+        public String getSpawnWorldName() {
+            return parseWorldName(spawnDimension != null ? spawnDimension : "minecraft:overworld");
+        }
 
         /**
          * Gets the world name from the dimension string. Converts "minecraft:overworld" to "world",
@@ -234,20 +277,24 @@ public class PlayerDataReader {
          * dimension key as-is.
          */
         public String getWorldName() {
-            if (dimension == null) {
+            return parseWorldName(dimension);
+        }
+
+        private static String parseWorldName(String dim) {
+            if (dim == null) {
                 return "world";
             }
 
-            return switch (dimension) {
+            return switch (dim) {
                 case "minecraft:overworld" -> "world";
                 case "minecraft:the_nether" -> "world_nether";
                 case "minecraft:the_end" -> "world_the_end";
                 default -> {
                     // For custom dimensions, try to extract just the key part
-                    if (dimension.contains(":")) {
-                        yield dimension.substring(dimension.indexOf(':') + 1);
+                    if (dim.contains(":")) {
+                        yield dim.substring(dim.indexOf(':') + 1);
                     }
-                    yield dimension;
+                    yield dim;
                 }
             };
         }

@@ -277,42 +277,79 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                 UUID playerDataUuid = (preloadedUser != null) ? preloadedUser.getUuid() : puuid;
                 var playerPosition = PlayerDataReader.readPlayerPosition(worldFolder, playerDataUuid);
                 if (playerPosition != null) {
-                    String targetWorldName = playerPosition.getWorldName();
-                    World targetWorld = Bukkit.getWorld(targetWorldName);
+                    if (playerPosition.isDead()) {
+                        plugin.getLogger()
+                                .debug("Player " + puuid + " was dead on disconnect.");
+                        if (playerPosition.hasRespawnPoint()) {
+                            String spawnWorldName = playerPosition.getSpawnWorldName();
+                            World spawnWorld = Bukkit.getWorld(spawnWorldName);
 
-                    // Fall back to dimension key lookup if standard name doesn't work
-                    if (targetWorld == null && playerPosition.dimension() != null) {
-                        for (World w : Bukkit.getWorlds()) {
-                            if (w.getKey().toString().equals(playerPosition.dimension())
-                                    || w.getName().equals(playerPosition.dimension())) {
-                                targetWorld = w;
-                                break;
+                            if (spawnWorld == null && playerPosition.spawnDimension() != null) {
+                                for (World w : Bukkit.getWorlds()) {
+                                    if (w.getKey().toString().equals(playerPosition.spawnDimension())
+                                            || w.getName().equals(playerPosition.spawnDimension())) {
+                                        spawnWorld = w;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (spawnWorld != null && !plugin.getConfiguration()
+                                    .get(ConfigurationKeys.LIMBO)
+                                    .contains(spawnWorld.getName())) {
+                                float yaw = playerPosition.spawnAngle() != null ? playerPosition.spawnAngle() : 0f;
+                                playerDataLocation = new Location(
+                                        spawnWorld,
+                                        playerPosition.spawnX() + 0.5,
+                                        playerPosition.spawnY(),
+                                        playerPosition.spawnZ() + 0.5,
+                                        yaw,
+                                        0f);
+                                plugin.getLogger()
+                                        .debug("Using bed/anchor respawn location for dead player " + puuid + ": " + playerDataLocation);
+                            }
+                        } else {
+                            plugin.getLogger()
+                                    .debug("Player " + puuid + " has no bed/anchor respawn point; will use default spawn.");
+                        }
+                    } else {
+                        String targetWorldName = playerPosition.getWorldName();
+                        World targetWorld = Bukkit.getWorld(targetWorldName);
+
+                        // Fall back to dimension key lookup if standard name doesn't work
+                        if (targetWorld == null && playerPosition.dimension() != null) {
+                            for (World w : Bukkit.getWorlds()) {
+                                if (w.getKey().toString().equals(playerPosition.dimension())
+                                        || w.getName().equals(playerPosition.dimension())) {
+                                    targetWorld = w;
+                                    break;
+                                }
                             }
                         }
-                    }
 
-                    if (targetWorld != null) {
-                        // Check if the saved location is in a limbo world - if so, don't use it
-                        // This prevents players who disconnected in limbo from being stuck there
-                        if (plugin.getConfiguration()
-                                .get(ConfigurationKeys.LIMBO)
-                                .contains(targetWorld.getName())) {
-                            plugin.getLogger()
-                                    .debug(
-                                            "Player "
-                                            + puuid
-                                            + " has saved location in limbo world "
-                                            + targetWorld.getName()
-                                            + ", ignoring");
-                        } else {
-                            playerDataLocation
-                                    = new Location(
-                                            targetWorld,
-                                            playerPosition.x(),
-                                            playerPosition.y(),
-                                            playerPosition.z(),
-                                            playerPosition.yaw(),
-                                            playerPosition.pitch());
+                        if (targetWorld != null) {
+                            // Check if the saved location is in a limbo world - if so, don't use it
+                            // This prevents players who disconnected in limbo from being stuck there
+                            if (plugin.getConfiguration()
+                                    .get(ConfigurationKeys.LIMBO)
+                                    .contains(targetWorld.getName())) {
+                                plugin.getLogger()
+                                        .debug(
+                                                "Player "
+                                                + puuid
+                                                + " has saved location in limbo world "
+                                                + targetWorld.getName()
+                                                + ", ignoring");
+                            } else {
+                                playerDataLocation
+                                        = new Location(
+                                                targetWorld,
+                                                playerPosition.x(),
+                                                playerPosition.y(),
+                                                playerPosition.z(),
+                                                playerPosition.yaw(),
+                                                playerPosition.pitch());
+                            }
                         }
                     }
                 }
@@ -337,21 +374,6 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                 // Cache their destination for after authentication
                 if (playerDataLocation != null) {
                     deferredSpawnCache.put(puuid, playerDataLocation);
-                } else {
-                    // Check if the current spawn location is valid (not a limbo world)
-                    if (!plugin.getConfiguration()
-                            .get(ConfigurationKeys.LIMBO)
-                            .contains(currentSpawn.getWorld().getName())) {
-                        deferredSpawnCache.put(puuid, currentSpawn);
-                    } else {
-                        // Fallback to lobby spawn if we can't find a safe previous location
-                        var fallbackLobby
-                                = plugin.getServerHandler()
-                                        .chooseLobbyServer(null, null, false, true);
-                        if (fallbackLobby != null) {
-                            deferredSpawnCache.put(puuid, fallbackLobby.getSpawnLocation());
-                        }
-                    }
                 }
                 setSpawn.accept(destination.value().getSpawnLocation());
             }
