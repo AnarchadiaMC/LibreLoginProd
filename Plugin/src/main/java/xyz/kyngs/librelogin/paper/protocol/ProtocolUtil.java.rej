@@ -1,0 +1,20 @@
+--- Plugin/src/main/java/xyz/kyngs/librelogin/paper/protocol/ProtocolUtil.java
++++ Plugin/src/main/java/xyz/kyngs/librelogin/paper/protocol/ProtocolUtil.java
+@@ -27,9 +27,16 @@
+
+     public static Object findNetworkManager(Object channel) {
++        Channel c = (Channel) channel;
++
++        Object pipelineManager = c.pipeline().get("packet_handler");
++        if (pipelineManager != null && NETWORK_MANAGER_CLASS.isInstance(pipelineManager)) {
++            return pipelineManager;
++        }
++
+         var managers = SpigotReflectionUtil.getNetworkManagers();
+         for (Object manager : managers) {
+             var managerChannel = (Channel) getChannel(manager);
+-            if (managerChannel.remoteAddress().equals(((Channel) channel).remoteAddress())) {
++            if (managerChannel == c || (managerChannel != null && managerChannel.remoteAddress() != null && managerChannel.remoteAddress().equals(c.remoteAddress()))) {
+                 return manager;
+             }
+         }
