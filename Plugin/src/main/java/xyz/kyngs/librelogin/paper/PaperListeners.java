@@ -43,10 +43,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.spigotmc.event.player.PlayerSpawnLocationEvent;
 import xyz.kyngs.librelogin.api.database.User;
 import xyz.kyngs.librelogin.common.AuthenticLibreLogin;
@@ -58,6 +60,7 @@ import xyz.kyngs.librelogin.paper.protocol.ClientPublicKey;
 import xyz.kyngs.librelogin.paper.protocol.EncryptionUtil;
 import xyz.kyngs.librelogin.paper.protocol.ProtocolUtil;
 import xyz.kyngs.librelogin.paper.util.PlayerDataReader;
+import xyz.kyngs.librelogin.paper.util.PlayerPositionStorage;
 
 /**
  * Coordinates Paper-specific login handling, including spawn routing, Floodgate interop, and the
@@ -108,6 +111,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
     private final Cache<UUID, User> preloadedUserCache;
     private final Cache<UUID, Location> deferredSpawnCache;
     private final Cache<UUID, SkinData> verifiedSkinCache;
+    private static final Object PRESENT = new Object();
+    private final Cache<UUID, Object> deadPendingAuthCache;
 
     public PaperListeners(PaperLibreLogin plugin) {
         super(plugin);
@@ -121,6 +126,8 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         deferredSpawnCache = Caffeine.newBuilder().expireAfterWrite(2, TimeUnit.MINUTES).build();
 
         verifiedSkinCache = Caffeine.newBuilder().expireAfterWrite(2, TimeUnit.MINUTES).build();
+
+        deadPendingAuthCache = Caffeine.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).build();
     }
 
     /**
@@ -133,15 +140,71 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         return deferredSpawnCache;
     }
 
+    public boolean isDeadPendingAuth(UUID uuid) {
+        return deadPendingAuthCache.getIfPresent(uuid) != null;
+    }
+
+    public void clearDeadPendingAuth(UUID uuid) {
+        deadPendingAuthCache.invalidate(uuid);
+    }
+
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        // checking is done here instead of in AsyncPlayerSpawnLocationEvent's handler
-        // cuz there is no (Player) object available in that event
         var player = event.getPlayer();
-        if (player.getHealth() == 0) {
-            player.setHealth(player.getMaxHealth());
+        var positionStorage = plugin.getPositionStorage();
+
+        boolean authorized = plugin.getAuthorizationProvider().isAuthorized(player)
+                && !plugin.getAuthorizationProvider().isAwaiting2FA(player);
+
+        if (authorized) {
+            if (player.getHealth() <= 0 || player.isDead()) {
+                if (positionStorage != null) {
+                    positionStorage.setDead(player.getUniqueId(), true, player.getBedSpawnLocation());
+                }
+            } else if (positionStorage != null && positionStorage.isValidGameplayWorld(player.getWorld())) {
+                positionStorage.saveLastValidLocation(player.getUniqueId(), player.getLocation());
+                positionStorage.clearDead(player.getUniqueId());
+            }
         }
-        GeneralUtil.runAsync(() -> onPlayerDisconnect(event.getPlayer()));
+        // If unauthorized (logging out in queue server / limbo), do NOT overwrite their location with limbo!
+
+        GeneralUtil.runAsync(() -> onPlayerDisconnect(player));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        var player = event.getEntity();
+        var positionStorage = plugin.getPositionStorage();
+        if (positionStorage != null) {
+            positionStorage.setDead(player.getUniqueId(), true, player.getBedSpawnLocation());
+        }
+
+        // If death occurred in a lobby world or limbo world:
+        if (positionStorage != null && !positionStorage.isValidGameplayWorld(player.getWorld())) {
+            event.setKeepInventory(true);
+            event.getDrops().clear();
+            event.setDroppedExp(0);
+            event.setKeepLevel(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerRespawn(PlayerRespawnEvent event) {
+        var player = event.getPlayer();
+        var positionStorage = plugin.getPositionStorage();
+        if (positionStorage != null) {
+            positionStorage.clearDead(player.getUniqueId());
+        }
+
+        // If player died in a lobby world, respawn cleanly
+        if (positionStorage != null && !positionStorage.isValidGameplayWorldName(player.getWorld().getName())) {
+            var bed = player.getBedSpawnLocation();
+            if (bed != null && positionStorage.isValidGameplayWorld(bed.getWorld())) {
+                event.setRespawnLocation(bed);
+            } else {
+                event.setRespawnLocation(player.getWorld().getSpawnLocation());
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -151,16 +214,25 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onJoin(PlayerJoinEvent event) {
-        var data = preloadedUserCache.getIfPresent(event.getPlayer().getUniqueId());
-        if (data == null && !plugin.fromFloodgate(event.getPlayer().getName())) {
-            event.getPlayer().kick(Component.text("Internal error, please try again later."));
+        var player = event.getPlayer();
+        var data = preloadedUserCache.getIfPresent(player.getUniqueId());
+        if (data == null && !plugin.fromFloodgate(player.getName())) {
+            player.kick(Component.text("Internal error, please try again later."));
             return;
         }
-        preloadedUserCache.invalidate(event.getPlayer().getUniqueId());
-        onPostLogin(event.getPlayer(), data);
-        plugin.stashMountForLimbo(event.getPlayer());
+        preloadedUserCache.invalidate(player.getUniqueId());
+        onPostLogin(player, data);
+
+        // If player was dead on disconnect, temporarily revive them in limbo so death screen doesn't block login
+        if (isDeadPendingAuth(player.getUniqueId())) {
+            player.setHealth(player.getMaxHealth());
+            player.setFoodLevel(20);
+            player.setFireTicks(0);
+        }
+
+        plugin.stashMountForLimbo(player);
         Bukkit.getScheduler()
-                .runTask(plugin.getBootstrap(), () -> plugin.stashMountForLimbo(event.getPlayer()));
+                .runTask(plugin.getBootstrap(), () -> plugin.stashMountForLimbo(player));
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -207,6 +279,11 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         event.setPlayerProfile(newProfile);
 
         preloadedUserCache.put(profileUuid, user);
+
+        var positionStorage = plugin.getPositionStorage();
+        if (positionStorage != null) {
+            positionStorage.loadPosition(profileUuid);
+        }
     }
 
     // Fallback handler for older Paper/Purpur versions without AsyncPlayerSpawnLocationEvent
@@ -264,7 +341,7 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                                                             ? "lobby"
                                                             : "limbo"))));
         } else {
-            // Try to read player's last position from player.dat
+            // Try to read player's last position from player.dat and persistent storage
             Location playerDataLocation = null;
             try {
                 // Get the primary world folder to read playerdata
@@ -275,44 +352,60 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                 // This is critical for cracked players whose connection UUID differs from
                 // the UUID stored in the database and used for their player.dat file
                 UUID playerDataUuid = (preloadedUser != null) ? preloadedUser.getUuid() : puuid;
+                var positionStorage = plugin.getPositionStorage();
                 var playerPosition = PlayerDataReader.readPlayerPosition(worldFolder, playerDataUuid);
-                if (playerPosition != null) {
-                    if (playerPosition.isDead()) {
-                        plugin.getLogger()
-                                .debug("Player " + puuid + " was dead on disconnect.");
-                        if (playerPosition.hasRespawnPoint()) {
-                            String spawnWorldName = playerPosition.getSpawnWorldName();
-                            World spawnWorld = Bukkit.getWorld(spawnWorldName);
 
-                            if (spawnWorld == null && playerPosition.spawnDimension() != null) {
-                                for (World w : Bukkit.getWorlds()) {
-                                    if (w.getKey().toString().equals(playerPosition.spawnDimension())
-                                            || w.getName().equals(playerPosition.spawnDimension())) {
-                                        spawnWorld = w;
-                                        break;
-                                    }
+                // Use puuid (profile UUID) for position storage — same key as pre-load and event handlers
+                UUID positionUuid = puuid;
+                boolean wasDead = (positionStorage != null && positionStorage.isDead(positionUuid))
+                        || (playerPosition != null && playerPosition.isDead());
+
+                if (wasDead) {
+                    deadPendingAuthCache.put(puuid, PRESENT);
+                    plugin.getLogger().debug("Player " + puuid + " was dead on disconnect.");
+
+                    Location bedSpawn = null;
+                    if (playerPosition != null && playerPosition.hasRespawnPoint()) {
+                        String spawnWorldName = playerPosition.getSpawnWorldName();
+                        World spawnWorld = Bukkit.getWorld(spawnWorldName);
+
+                        if (spawnWorld == null && playerPosition.spawnDimension() != null) {
+                            for (World w : Bukkit.getWorlds()) {
+                                if (w.getKey().toString().equals(playerPosition.spawnDimension())
+                                        || w.getName().equals(playerPosition.spawnDimension())) {
+                                    spawnWorld = w;
+                                    break;
                                 }
                             }
-
-                            if (spawnWorld != null && !plugin.getConfiguration()
-                                    .get(ConfigurationKeys.LIMBO)
-                                    .contains(spawnWorld.getName())) {
-                                float yaw = playerPosition.spawnAngle() != null ? playerPosition.spawnAngle() : 0f;
-                                playerDataLocation = new Location(
-                                        spawnWorld,
-                                        playerPosition.spawnX() + 0.5,
-                                        playerPosition.spawnY(),
-                                        playerPosition.spawnZ() + 0.5,
-                                        yaw,
-                                        0f);
-                                plugin.getLogger()
-                                        .debug("Using bed/anchor respawn location for dead player " + puuid + ": " + playerDataLocation);
-                            }
-                        } else {
-                            plugin.getLogger()
-                                    .debug("Player " + puuid + " has no bed/anchor respawn point; will use default spawn.");
                         }
+
+                        if (spawnWorld != null && (positionStorage == null || positionStorage.isValidGameplayWorld(spawnWorld))) {
+                            float yaw = playerPosition.spawnAngle() != null ? playerPosition.spawnAngle() : 0f;
+                            bedSpawn = new Location(
+                                    spawnWorld,
+                                    playerPosition.spawnX() + 0.5,
+                                    playerPosition.spawnY(),
+                                    playerPosition.spawnZ() + 0.5,
+                                    yaw,
+                                    0f);
+                        }
+                    }
+
+                    if (bedSpawn == null && positionStorage != null) {
+                        bedSpawn = positionStorage.getBedSpawn(positionUuid);
+                    }
+
+                    if (bedSpawn != null) {
+                        playerDataLocation = bedSpawn;
+                        plugin.getLogger().debug("Using bed/anchor respawn location for dead player " + puuid + ": " + playerDataLocation);
                     } else {
+                        // Vanilla respawn mechanics: primary world default spawn
+                        playerDataLocation = primaryWorld.getSpawnLocation();
+                        plugin.getLogger().debug("Player " + puuid + " has no bed/anchor respawn point; using vanilla world spawn: " + playerDataLocation);
+                    }
+                } else {
+                    Location candidateLocation = null;
+                    if (playerPosition != null) {
                         String targetWorldName = playerPosition.getWorldName();
                         World targetWorld = Bukkit.getWorld(targetWorldName);
 
@@ -327,28 +420,30 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                             }
                         }
 
-                        if (targetWorld != null) {
-                            // Check if the saved location is in a limbo world - if so, don't use it
-                            // This prevents players who disconnected in limbo from being stuck there
-                            if (plugin.getConfiguration()
-                                    .get(ConfigurationKeys.LIMBO)
-                                    .contains(targetWorld.getName())) {
-                                plugin.getLogger()
-                                        .debug(
-                                                "Player "
-                                                + puuid
-                                                + " has saved location in limbo world "
-                                                + targetWorld.getName()
-                                                + ", ignoring");
-                            } else {
-                                playerDataLocation
-                                        = new Location(
-                                                targetWorld,
-                                                playerPosition.x(),
-                                                playerPosition.y(),
-                                                playerPosition.z(),
-                                                playerPosition.yaw(),
-                                                playerPosition.pitch());
+                        if (targetWorld != null && (positionStorage == null || positionStorage.isValidGameplayWorld(targetWorld))) {
+                            candidateLocation = new Location(
+                                    targetWorld,
+                                    playerPosition.x(),
+                                    playerPosition.y(),
+                                    playerPosition.z(),
+                                    playerPosition.yaw(),
+                                    playerPosition.pitch());
+                        }
+                    }
+
+                    if (candidateLocation != null) {
+                        playerDataLocation = candidateLocation;
+                        if (positionStorage != null) {
+                            positionStorage.saveLastValidLocation(positionUuid, candidateLocation);
+                        }
+                    } else {
+                        // player.dat had a limbo or lobby world (e.g. player disconnected in queue or lobby)
+                        // Fall back to our persistent position storage!
+                        if (positionStorage != null) {
+                            var storedLocation = positionStorage.getLastValidLocation(positionUuid);
+                            if (storedLocation != null) {
+                                playerDataLocation = storedLocation;
+                                plugin.getLogger().debug("Restored last valid location for player " + puuid + " from persistent storage: " + playerDataLocation);
                             }
                         }
                     }

@@ -222,6 +222,10 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
         return databaseProvider;
     }
 
+    public DatabaseConnector<?, ?> getDatabaseConnector() {
+        return databaseConnector;
+    }
+
     @Override
     public AuthenticPremiumProvider getPremiumProvider() {
         return premiumProvider;

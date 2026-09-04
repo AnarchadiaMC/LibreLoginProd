@@ -65,8 +65,13 @@ java {
     }
 }
 
-tasks.withType<Jar> {
+tasks.named<Jar>("jar") {
+    archiveClassifier.set("dev")
     from("../LICENSE.txt")
+}
+
+tasks.assemble {
+    dependsOn(tasks.named("shadowJar"))
 }
 
 libby {

@@ -36,22 +36,38 @@ import org.bukkit.entity.Pig;
 import org.bukkit.util.Vector;
 import xyz.kyngs.librelogin.api.Logger;
 import xyz.kyngs.librelogin.api.database.User;
+import xyz.kyngs.librelogin.api.database.connector.SQLDatabaseConnector;
 import xyz.kyngs.librelogin.api.event.exception.EventCancelledException;
 import xyz.kyngs.librelogin.common.AuthenticLibreLogin;
 import xyz.kyngs.librelogin.common.SLF4JLogger;
+import xyz.kyngs.librelogin.common.database.AuthenticDatabaseProvider;
 import xyz.kyngs.librelogin.common.image.AuthenticImageProjector;
 import xyz.kyngs.librelogin.common.util.CancellableTask;
 import xyz.kyngs.librelogin.paper.protocol.PacketListener;
+import xyz.kyngs.librelogin.paper.util.PlayerPositionStorage;
 
 public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
 
     private final PaperBootstrap bootstrap;
     private PaperListeners listeners;
     private PacketListener packetListener;
+    private PlayerPositionStorage positionStorage;
     private final Map<UUID, StashedMount> stashedMounts = new ConcurrentHashMap<>();
     private boolean started;
 
     private record StashedMount(EntitySnapshot snapshot, String typeName) {}
+
+    public PlayerPositionStorage getPositionStorage() {
+        return positionStorage;
+    }
+
+    public SQLDatabaseConnector getSQLDatabaseConnector() {
+        if (getDatabaseProvider() instanceof AuthenticDatabaseProvider<?> authProvider
+                && authProvider.getConnector() instanceof SQLDatabaseConnector sqlConnector) {
+            return sqlConnector;
+        }
+        return null;
+    }
 
     public PaperLibreLogin(PaperBootstrap bootstrap) {
         this.bootstrap = bootstrap;
@@ -235,6 +251,9 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
     @Override
     protected void disable() {
         PacketEvents.getAPI().terminate();
+        if (positionStorage != null) {
+            positionStorage.saveSync();
+        }
         if (getDatabaseProvider() == null) {
             return; // Not initialized
         }
@@ -296,6 +315,8 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
                     player.updateInventory();
                 });
 
+        positionStorage = new PlayerPositionStorage(this);
+
         listeners = new PaperListeners(this);
 
         Bukkit.getPluginManager().registerEvents(listeners, bootstrap);
@@ -326,7 +347,10 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
         try {
 
             var location = listeners.getSpawnLocationCache().getIfPresent(player.getUniqueId());
-            boolean isNewPlayer = (location == null);
+            boolean wasDead = listeners.isDeadPendingAuth(player.getUniqueId())
+                    || (positionStorage != null && positionStorage.isDead(player.getUniqueId()));
+            boolean isNewPlayer = (location == null) && !wasDead;
+            UUID dataUuid = (user != null) ? user.getUuid() : player.getUniqueId();
 
             // Safety check: NEVER teleport to a limbo world after authentication
             // This is defense-in-depth in case the caching logic fails or cache has stale data
@@ -341,9 +365,17 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
                                     + player.getName()
                                     + " was in limbo world "
                                     + location.getWorld().getName()
-                                    + ". Forcing lobby spawn.");
+                                    + ". Forcing fallback lookup.");
                     listeners.getSpawnLocationCache().invalidate(player.getUniqueId());
-                    location = null; // Force fallback to lobby
+                    location = null; // Force fallback to persistent storage or lobby
+                }
+            }
+
+            // If location is null (or was invalidated from limbo), check persistent storage before defaulting to lobby
+            if (location == null && positionStorage != null) {
+                location = positionStorage.getLastValidLocation(dataUuid);
+                if (location != null) {
+                    getLogger().debug("Restored location for authenticated player " + player.getName() + " from persistent storage: " + location);
                 }
             }
 
@@ -357,8 +389,20 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
 
                 location = world.getSpawnLocation();
             } else {
-                isNewPlayer = false; // Has cached location, not a new player
+                isNewPlayer = false; // Has cached or stored location, not a new player
                 listeners.getSpawnLocationCache().invalidate(player.getUniqueId());
+            }
+
+            // If player was dead on disconnect, they are respawning, so they are not a new player
+            if (wasDead) {
+                isNewPlayer = false;
+                player.setHealth(player.getMaxHealth());
+                player.setFoodLevel(20);
+                player.setFireTicks(0);
+                if (positionStorage != null) {
+                    positionStorage.clearDead(dataUuid);
+                }
+                listeners.clearDeadPendingAuth(player.getUniqueId());
             }
 
             var finalLocation = location;
@@ -397,6 +441,12 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
 
                                                                         if (!player.isOnline()) {
                                                                             return;
+                                                                        }
+
+                                                                        if (wasDead) {
+                                                                            player.setHealth(player.getMaxHealth());
+                                                                            player.setFoodLevel(20);
+                                                                            player.setFireTicks(0);
                                                                         }
 
                                                                         restoreStashedMount(player);

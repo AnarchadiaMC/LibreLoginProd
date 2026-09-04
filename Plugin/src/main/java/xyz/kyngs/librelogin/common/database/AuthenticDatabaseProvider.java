@@ -21,5 +21,9 @@ public abstract class AuthenticDatabaseProvider<C extends DatabaseConnector<?, ?
         this.plugin = plugin;
     }
 
+    public C getConnector() {
+        return connector;
+    }
+
     public void validateSchema() {}
 }
