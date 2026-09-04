@@ -283,6 +283,9 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
         var positionStorage = plugin.getPositionStorage();
         if (positionStorage != null) {
             positionStorage.loadPosition(profileUuid);
+            if (user != null && user.getUuid() != null && !user.getUuid().equals(profileUuid)) {
+                positionStorage.loadPosition(user.getUuid());
+            }
         }
     }
 
@@ -295,7 +298,7 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
             return;
         }
         handleSpawnLocationPublic(
-                event.getPlayer().getUniqueId(), event.getSpawnLocation(), event::setSpawnLocation);
+                event.getPlayer().getUniqueId(), event.getSpawnLocation(), event::setSpawnLocation, !event.getPlayer().hasPlayedBefore());
     }
 
     /**
@@ -309,6 +312,11 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
      */
     public void handleSpawnLocationPublic(
             UUID puuid, Location currentSpawn, java.util.function.Consumer<Location> setSpawn) {
+        handleSpawnLocationPublic(puuid, currentSpawn, setSpawn, !Bukkit.getOfflinePlayer(puuid).hasPlayedBefore());
+    }
+
+    public void handleSpawnLocationPublic(
+            UUID puuid, Location currentSpawn, java.util.function.Consumer<Location> setSpawn, boolean isNewPlayer) {
         var cachedAddress = addressCache.getIfPresent(puuid);
         if (cachedAddress == null) {
             Bukkit.getScheduler()
@@ -347,6 +355,19 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                 // Get the primary world folder to read playerdata
                 var primaryWorld = Bukkit.getWorlds().get(0);
                 Path worldFolder = primaryWorld.getWorldFolder().toPath();
+                if (!java.nio.file.Files.exists(worldFolder.resolve("playerdata"))) {
+                    Path containerPath = Bukkit.getWorldContainer().toPath();
+                    if (java.nio.file.Files.exists(containerPath.resolve("world").resolve("playerdata"))) {
+                        worldFolder = containerPath.resolve("world");
+                    } else {
+                        for (World w : Bukkit.getWorlds()) {
+                            if (java.nio.file.Files.exists(w.getWorldFolder().toPath().resolve("playerdata"))) {
+                                worldFolder = w.getWorldFolder().toPath();
+                                break;
+                            }
+                        }
+                    }
+                }
 
                 // Use the database UUID, not the connection UUID, for player data lookup
                 // This is critical for cracked players whose connection UUID differs from
@@ -354,10 +375,13 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                 UUID playerDataUuid = (preloadedUser != null) ? preloadedUser.getUuid() : puuid;
                 var positionStorage = plugin.getPositionStorage();
                 var playerPosition = PlayerDataReader.readPlayerPosition(worldFolder, playerDataUuid);
+                if (playerPosition == null && !playerDataUuid.equals(puuid)) {
+                    playerPosition = PlayerDataReader.readPlayerPosition(worldFolder, puuid);
+                }
 
                 // Use puuid (profile UUID) for position storage — same key as pre-load and event handlers
                 UUID positionUuid = puuid;
-                boolean wasDead = (positionStorage != null && positionStorage.isDead(positionUuid))
+                boolean wasDead = (positionStorage != null && (positionStorage.isDead(positionUuid) || (preloadedUser != null && preloadedUser.getUuid() != null && positionStorage.isDead(preloadedUser.getUuid()))))
                         || (playerPosition != null && playerPosition.isDead());
 
                 if (wasDead) {
@@ -393,6 +417,9 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
 
                     if (bedSpawn == null && positionStorage != null) {
                         bedSpawn = positionStorage.getBedSpawn(positionUuid);
+                        if (bedSpawn == null && preloadedUser != null && preloadedUser.getUuid() != null) {
+                            bedSpawn = positionStorage.getBedSpawn(preloadedUser.getUuid());
+                        }
                     }
 
                     if (bedSpawn != null) {
@@ -431,16 +458,27 @@ public class PaperListeners extends AuthenticListeners<PaperLibreLogin, Player, 
                         }
                     }
 
+                    // Fallback to currentSpawn provided by Paper's event (already loaded from player.dat by Minecraft)
+                    // Only use currentSpawn if this is a returning player (not a brand new player)
+                    if (candidateLocation == null && !isNewPlayer && currentSpawn != null && currentSpawn.getWorld() != null) {
+                        if (positionStorage == null || positionStorage.isValidGameplayWorld(currentSpawn.getWorld())) {
+                            candidateLocation = currentSpawn;
+                        }
+                    }
+
                     if (candidateLocation != null) {
                         playerDataLocation = candidateLocation;
                         if (positionStorage != null) {
                             positionStorage.saveLastValidLocation(positionUuid, candidateLocation);
                         }
                     } else {
-                        // player.dat had a limbo or lobby world (e.g. player disconnected in queue or lobby)
+                        // player.dat and currentSpawn had a limbo world (e.g. player disconnected in queue or limbo)
                         // Fall back to our persistent position storage!
                         if (positionStorage != null) {
                             var storedLocation = positionStorage.getLastValidLocation(positionUuid);
+                            if (storedLocation == null && preloadedUser != null && preloadedUser.getUuid() != null) {
+                                storedLocation = positionStorage.getLastValidLocation(preloadedUser.getUuid());
+                            }
                             if (storedLocation != null) {
                                 playerDataLocation = storedLocation;
                                 plugin.getLogger().debug("Restored last valid location for player " + puuid + " from persistent storage: " + playerDataLocation);

@@ -410,15 +410,24 @@ public class PlayerPositionStorage {
             return world;
         }
         for (World w : Bukkit.getWorlds()) {
-            if (w.getName().equalsIgnoreCase(worldName)) {
+            if (w.getName().equalsIgnoreCase(worldName)
+                    || w.getKey().toString().equalsIgnoreCase(worldName)
+                    || w.getKey().getKey().equalsIgnoreCase(worldName)) {
                 return w;
             }
+        }
+        if ("minecraft:overworld".equalsIgnoreCase(worldName)) {
+            return Bukkit.getWorld("world");
+        } else if ("minecraft:the_nether".equalsIgnoreCase(worldName)) {
+            return Bukkit.getWorld("world_nether");
+        } else if ("minecraft:the_end".equalsIgnoreCase(worldName)) {
+            return Bukkit.getWorld("world_the_end");
         }
         return null;
     }
 
     /**
-     * Checks if a World corresponds to a valid gameplay world (neither limbo nor lobby).
+     * Checks if a World corresponds to a valid gameplay world (not limbo).
      */
     public boolean isValidGameplayWorld(@Nullable World world) {
         if (world == null) {
@@ -426,16 +435,19 @@ public class PlayerPositionStorage {
         }
         var serverHandler = plugin.getServerHandler();
         if (serverHandler != null) {
-            if (serverHandler.getLimboServers().contains(world)
-                    || serverHandler.getLobbyServers().containsValue(world)) {
+            if (serverHandler.getLimboServers().contains(world)) {
                 return false;
             }
+        }
+        var limboWorlds = plugin.getConfiguration().get(xyz.kyngs.librelogin.common.config.ConfigurationKeys.LIMBO);
+        if (limboWorlds != null && limboWorlds.contains(world.getName())) {
+            return false;
         }
         return true;
     }
 
     /**
-     * Checks if a world name corresponds to a valid gameplay world (neither limbo nor lobby).
+     * Checks if a world name corresponds to a valid gameplay world (not limbo).
      */
     public boolean isValidGameplayWorldName(@Nullable String worldName) {
         if (worldName == null || worldName.isBlank()) {
@@ -447,10 +459,6 @@ public class PlayerPositionStorage {
         }
         var limboWorlds = plugin.getConfiguration().get(xyz.kyngs.librelogin.common.config.ConfigurationKeys.LIMBO);
         if (limboWorlds != null && limboWorlds.contains(worldName)) {
-            return false;
-        }
-        var lobbyWorlds = plugin.getConfiguration().get(xyz.kyngs.librelogin.common.config.ConfigurationKeys.LOBBY);
-        if (lobbyWorlds != null && lobbyWorlds.values().contains(worldName)) {
             return false;
         }
         return true;

@@ -28,6 +28,7 @@ public class AsyncSpawnLocationListener implements Listener {
         paperListeners.handleSpawnLocationPublic(
                 event.getConnection().getProfile().getId(),
                 event.getSpawnLocation(),
-                event::setSpawnLocation);
+                event::setSpawnLocation,
+                event.isNewPlayer());
     }
 }

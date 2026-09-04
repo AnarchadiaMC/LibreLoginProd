@@ -27,6 +27,7 @@ import org.bstats.bukkit.Metrics;
 import org.bstats.charts.CustomChart;
 import org.bstats.charts.SimplePie;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.AbstractHorse;
 import org.bukkit.entity.Entity;
@@ -348,8 +349,9 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
 
             var location = listeners.getSpawnLocationCache().getIfPresent(player.getUniqueId());
             boolean wasDead = listeners.isDeadPendingAuth(player.getUniqueId())
-                    || (positionStorage != null && positionStorage.isDead(player.getUniqueId()));
-            boolean isNewPlayer = (location == null) && !wasDead;
+                    || (positionStorage != null && (positionStorage.isDead(player.getUniqueId())
+                            || (user != null && user.getUuid() != null && positionStorage.isDead(user.getUuid()))));
+            boolean isNewPlayer = (location == null) && !wasDead && !player.hasPlayedBefore();
             UUID dataUuid = (user != null) ? user.getUuid() : player.getUniqueId();
 
             // Safety check: NEVER teleport to a limbo world after authentication
@@ -373,9 +375,48 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
 
             // If location is null (or was invalidated from limbo), check persistent storage before defaulting to lobby
             if (location == null && positionStorage != null) {
-                location = positionStorage.getLastValidLocation(dataUuid);
+                location = positionStorage.getLastValidLocation(player.getUniqueId());
+                if (location == null && user != null && user.getUuid() != null) {
+                    location = positionStorage.getLastValidLocation(user.getUuid());
+                }
                 if (location != null) {
                     getLogger().debug("Restored location for authenticated player " + player.getName() + " from persistent storage: " + location);
+                }
+            }
+
+            // If location is still null, check player.dat as an ultimate fallback
+            if (location == null) {
+                try {
+                    var primaryWorld = Bukkit.getWorlds().get(0);
+                    java.nio.file.Path worldFolder = primaryWorld.getWorldFolder().toPath();
+                    if (!java.nio.file.Files.exists(worldFolder.resolve("playerdata"))) {
+                        java.nio.file.Path containerPath = Bukkit.getWorldContainer().toPath();
+                        if (java.nio.file.Files.exists(containerPath.resolve("world").resolve("playerdata"))) {
+                            worldFolder = containerPath.resolve("world");
+                        } else {
+                            for (World w : Bukkit.getWorlds()) {
+                                if (java.nio.file.Files.exists(w.getWorldFolder().toPath().resolve("playerdata"))) {
+                                    worldFolder = w.getWorldFolder().toPath();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    var pPos = xyz.kyngs.librelogin.paper.util.PlayerDataReader.readPlayerPosition(worldFolder, player.getUniqueId());
+                    if (pPos == null && user != null && user.getUuid() != null) {
+                        pPos = xyz.kyngs.librelogin.paper.util.PlayerDataReader.readPlayerPosition(worldFolder, user.getUuid());
+                    }
+                    if (pPos != null) {
+                        World tw = Bukkit.getWorld(pPos.getWorldName());
+                        if (tw == null) {
+                            tw = Bukkit.getWorld(pPos.dimension());
+                        }
+                        if (tw != null && (positionStorage == null || positionStorage.isValidGameplayWorld(tw))) {
+                            location = new Location(tw, pPos.x(), pPos.y(), pPos.z(), pPos.yaw(), pPos.pitch());
+                            getLogger().debug("Restored location for authenticated player " + player.getName() + " from player.dat fallback: " + location);
+                        }
+                    }
+                } catch (Exception ignored) {
                 }
             }
 
@@ -400,7 +441,10 @@ public class PaperLibreLogin extends AuthenticLibreLogin<Player, World> {
                 player.setFoodLevel(20);
                 player.setFireTicks(0);
                 if (positionStorage != null) {
-                    positionStorage.clearDead(dataUuid);
+                    positionStorage.clearDead(player.getUniqueId());
+                    if (user != null && user.getUuid() != null) {
+                        positionStorage.clearDead(user.getUuid());
+                    }
                 }
                 listeners.clearDeadPendingAuth(player.getUniqueId());
             }
